@@ -4,10 +4,10 @@ library(shinyBS)
 shinyUI(navbarPage("HybRIDS",
                    
                    tabPanel("Sequence Data",
-                            HTML("<h1>Input DNA sequence file.</h1><hr>"),
-                            HTML("<p>Upload your FASTA file containing sequences from your different populations to get started.</p>"),
-                            HTML("<p>Note: Duplicate Sequences will be removed.</p>"),
-                            HTML("<hr><div align='center'>"),
+                            h1("Input DNA sequence file."),hr(),
+                            p("Upload your FASTA file containing sequences from your different populations to get started."),
+                            p("Note: Duplicate Sequences will be removed."), hr(),
+                            div(align='center',
                             fileInput('fastafile', 'Choose FASTA file to upload',
                                       accept = c(
                                         '.fas',
@@ -15,13 +15,13 @@ shinyUI(navbarPage("HybRIDS",
                                         '.FAS',
                                         '.FASTA'
                                       )
-                            ),
-                            HTML("</div><hr>"),
+                            )),
+                            hr(),
                             htmlOutput("SeqInfo")
                             ),
                    
                    tabPanel("Specify Triplets to Analyze",
-                            HTML("<h1>Specify sequence combinations to scan.</h1><hr>"),
+                            h1("Specify sequence combinations to scan."), hr(),
                             fluidRow(column(6,
                                             h3("Specify what triplets to scan:"),
                                             "By default, every possible combination of 3 sequences will be analyzed.",
@@ -48,15 +48,15 @@ shinyUI(navbarPage("HybRIDS",
                                               )  
                                      ),
                                      column(6,
-                                            fluidRow(column(6, HTML("<b>Number of combinations to scan: </b>"),
+                                            fluidRow(column(6, strong("Number of combinations to scan: "),
                                                             textOutput("NumCombos"),
-                                                            HTML("</br><b>Combinations to scan:</b><br>"),
+                                                            strong("Combinations to scan:"),
                                                             htmlOutput("GeneratedTriplets")))
                                             ))),
                    
                    tabPanel("Analyze Triplets",
                             h1("Analyze and Explore Sequence Triplets"),
-                            HTML("<hr>"),
+                            hr(),
                             fluidRow(
                               column(4,
                                      inputPanel(
@@ -84,7 +84,7 @@ shinyUI(navbarPage("HybRIDS",
                                        selectInput("correctionModel", "Mutation correction model:", c("JC69", "K80", "F81",
                                                                                                       "K81", "F84", "BH87",
                                                                                                       "T92", "TN93", "GG95"))))),
-                            tags$hr(),
+                            hr(),
                             bsCollapse(multiple = FALSE, open = "col1", id = "collapse1",
                                        bsCollapsePanel("Sequence Similarity, RGB plot",
                                                        plotOutput("barsPlot"),
