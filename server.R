@@ -1,3 +1,7 @@
+installed <- installed.packages()
+# If the user has HybRIDS installed then all these should be installed anyway.
+pkg <- c("shiny", "ggplot2", "png", "grid", "gridExtra", "ape")
+
 library(shiny)
 library(shinyBS)
 
@@ -12,7 +16,7 @@ shinyServer(function(input, output) {
     validate(
       need(grepl(".fas", input$fastafile$name) || grepl(".fasta", input$fastafile$name), "Provide a FASTA format sequence file.")
     )
-    hybridsobj$inputDNA(input$fastafile$datapath, "fasta")
+    hybridsobj$inputDNA(input$fastafile$datapath)
   })
   
   output$SeqInfo <- renderText({
@@ -85,6 +89,29 @@ shinyServer(function(input, output) {
     hybridsobj$analyzeSS(currentTripletSelection())
   })
   
+  updatePlottingSettings <- reactive({
+    hybridsobj$setParameters("Plotting", PlotTitle = input$plotTitle,
+                             TitleSize = input$plotTitleSize,
+                             TitleFace = input$plotTitleFace,
+                             TitleColour = input$plotTitleColour,
+                             XLabels = input$plotXLabels,
+                             YLabels = input$plotYLabels,
+                             XTitle = input$plotXTitle,
+                             XTitleFontSize = input$plotXTitleFontSize,
+                             XTitleColour = input$plotXTitleColour,
+                             XLabelSize = input$plotXLabelSize,
+                             XLabelColour = input$plotXLabelColour,
+                             YTitle = input$plotYTitle,
+                             YTitleFontSize = input$plotYTitleFontSize,
+                             YTitleColour = input$plotYTitleColour,
+                             YLabelSize = input$plotYLabelSize,
+                             YLabelColour = input$plotYLabelColour,
+                             Legends = input$plotLegends,
+                             LegendFontSize = input$plotLegendFontSize,
+                             MosaicScale = input$plotMosaicScale)
+  })
+  
+  
   findBlocks <- reactive({
     scanSeqSim()
     hybridsobj$setParameters("BlockDetection", ManualThresholds = input$manBlockDetectDist,
@@ -102,11 +129,13 @@ shinyServer(function(input, output) {
   })
   
   output$barsPlot <- renderPlot({
+    updatePlottingSettings()
     scanSeqSim()
     print(hybridsobj$plotTriplets(currentTripletSelection(), What="Bars"))
   })
   
   output$linesPlot <- renderPlot({
+    updatePlottingSettings()
     scanSeqSim()
     print(hybridsobj$plotTriplets(currentTripletSelection(), What="Lines"))
   })

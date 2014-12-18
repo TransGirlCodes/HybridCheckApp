@@ -84,6 +84,66 @@ shinyUI(navbarPage("HybRIDS",
                                        selectInput("correctionModel", "Mutation correction model:", c("JC69", "K80", "F81",
                                                                                                       "K81", "F84", "BH87",
                                                                                                       "T92", "TN93", "GG95"))))),
+                            bsCollapse(
+                                       bsCollapsePanel("Plotting Settings",
+                                                       fluidRow(
+                                                         column(4,
+                                                                inputPanel(
+                                                                  h4("Plot title settings:"),
+                                                                  br(),
+                                                                  checkboxInput("plotTitle", "Include a title in the plot?", TRUE),
+                                                                  br(),
+                                                                  numericInput("plotTitleSize", "Font size of plot titles", 14),
+                                                                  br(),
+                                                                  textInput("plotTitleFace", "Font face of plot titles", "bold"),
+                                                                  br(),
+                                                                  textInput("plotTitleColour", "Colour of plot titles", "black"),
+                                                                  br(),
+                                                                  h4("Legend settings:"),
+                                                                  br(),
+                                                                  checkboxInput("plotLegends", "Add legends to the plots?", TRUE),
+                                                                  br(),
+                                                                  numericInput("plotLegendFontSize", "Font size for legend", 12)
+                                                                  )),
+                                                         column(4,
+                                                                inputPanel(
+                                                                  h4("X axis options:"),
+                                                                  br(),
+                                                                  checkboxInput("plotXTitle", "Include the title of the x-axis in the plots?", TRUE),
+                                                                  br(),
+                                                                  numericInput("plotXTitleFontSize", "Font size of x-axis title", 12),
+                                                                  br(),
+                                                                  textInput("plotXTitleColour", "Colour of x-axis title", "black"),
+                                                                  br(),
+                                                                  checkboxInput("plotXLabels", "Include the value labels of the x-axis in the plots?", TRUE),
+                                                                  br(),
+                                                                  numericInput("plotXLabelSize", "Font size of x-axis labels", 10),
+                                                                  br(),
+                                                                  textInput("plotXLabelColour", "Colour of x-axis labels", "black")
+                                                                )),
+                                                         column(4,
+                                                                inputPanel(
+                                                                  h4("Y axis options:"),
+                                                                  br(),
+                                                                  checkboxInput("plotYTitle", "Include the title of the y-axis in the plots?", TRUE),
+                                                                  br(),
+                                                                  numericInput("plotYTitleFontSize", "Font size of y-axis title", 12),
+                                                                  br(),
+                                                                  textInput("plotYTitleColour", "Colour of y-axis title", "black"),
+                                                                  br(),
+                                                                  checkboxInput("plotYLabels", "Include the value labels of the y-axis in the plots?", TRUE),
+                                                                  br(),
+                                                                  numericInput("plotYLabelSize", "Font size of y-axis labels", 10),
+                                                                  br(),
+                                                                  textInput("plotYLabelColour", "Colour of y-axis labels", "black")
+                                                                ))),
+                                                       fluidRow(
+                                                         inputPanel(
+                                                           h4("Other Settings:"),
+                                                           numericInput("plotMosaicScale", "Number of segments in RGB bars", 500)
+                                                           ))
+                                                       
+                                                       )),
                             hr(),
                             bsCollapse(multiple = FALSE, open = "col1", id = "collapse1",
                                        bsCollapsePanel("Sequence Similarity, RGB plot",
@@ -93,7 +153,6 @@ shinyUI(navbarPage("HybRIDS",
                                        bsCollapsePanel("Sequence Similarity, lines plot",
                                                        plotOutput("linesPlot"),
                                                        id="col2",
-                                                       value="test2")
-                            ),
+                                                       value="test2")),
                             dataTableOutput("blocksTable")                    
 )))
