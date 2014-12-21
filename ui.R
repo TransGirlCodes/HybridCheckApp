@@ -57,6 +57,7 @@ shinyUI(navbarPage("HybRIDS",
                    tabPanel("Analyze Triplets",
                             h1("Analyze and Explore Sequence Triplets"),
                             hr(),
+                            h2("Settings:"),
                             fluidRow(
                               column(4,
                                      inputPanel(
@@ -64,13 +65,15 @@ shinyUI(navbarPage("HybRIDS",
                                        numericInput("windowSize", "Size of sliding window (in bp):", min=1, value=100),
                                        numericInput("stepSize", "Step size of sliding window (in bp):", min=1, value=1)),
                                      inputPanel(
-                                       uiOutput("TripletSelector")
+                                       uiOutput("TripletToAnalyze"),
+                                       br(),
+                                       actionButton("analysisGO", "Run Analysis")
                                        )),
                               column(4,
                                      inputPanel(
                                        h4("Block detection settings:"),
                                        radioButtons("detectionMethod", "Use a manual threshold?", c("Yes" = "yes", "No, automatically decide thresholds from data." = "no"), selected="no"),
-                                       checkboxInput("fallbackManual", "Fallback to a manual threshold?"),
+                                       checkboxInput("fallbackManual", "Fallback to a manual threshold?", value = TRUE),
                                        conditionalPanel("input.detectionMethod == 'yes' || input.fallbackManual", 
                                                         sliderInput("manBlockDetectDist", "Sequence Similarity Threshold:", 1, 100, value=95, step=1))
                                      )),
@@ -142,9 +145,12 @@ shinyUI(navbarPage("HybRIDS",
                                                            h4("Other Settings:"),
                                                            numericInput("plotMosaicScale", "Number of segments in RGB bars", 500)
                                                            ))
-                                                       
                                                        )),
                             hr(),
+                            h2("View Results:"),
+                            fluidRow(div(inputPanel(uiOutput("TripletSelector"), downloadButton("savePlots", "Save Plots"), downloadButton("saveTable", "Save Table"), align="center"))),
+                            br(),
+                            fluidRow(column(12,
                             bsCollapse(multiple = FALSE, open = "col1", id = "collapse1",
                                        bsCollapsePanel("Sequence Similarity, RGB plot",
                                                        plotOutput("barsPlot"),
@@ -154,5 +160,38 @@ shinyUI(navbarPage("HybRIDS",
                                                        plotOutput("linesPlot"),
                                                        id="col2",
                                                        value="test2")),
-                            dataTableOutput("blocksTable")                    
-)))
+                            dataTableOutput("blocksTable"))),
+                            id = "tab"
+                            ),
+                   
+                   tabPanel("Analyze user defined regions",
+                            h1("Analyze user defined regions"),
+                            hr(),
+                            "You can specify a recombinant block between two sequences,
+                            and analyze it according to the settings.",
+                            fluidRow(
+                              column(4,
+                                     inputPanel(
+                                       h4("Add or clear user blocks:"),
+                                       uiOutput("userBlocksAdd"),
+                                       numericInput("startPosition", "Start of block in BP", value = NULL,
+                                                    min = 1),
+                                       numericInput("endPosition", "End of block in BP", value = NULL,
+                                                    min = 1)
+                                       
+                                       )),
+                              column(4,
+                                     inputPanel(
+                                       h4("Block dating settings:"),
+                                       numericInput("mu2", "Mutation Rate:", 10e-8),
+                                       numericInput("alpha2", "Critical Value (alpha):", 0.05),
+                                       checkboxInput("bonf2", "Bonferoni Correct Critical Value", TRUE),
+                                       checkboxInput("eliminateinsignificant2", "Eliminate insignificant blocks", TRUE),
+                                       selectInput("correctionModel2", "Mutation correction model:", c("JC69", "K80", "F81",
+                                                                                                      "K81", "F84", "BH87",
+                                                                                                      "T92", "TN93", "GG95"))))
+                              
+                              ),
+                            dataTableOutput("userBlocksTable")
+                            )
+))

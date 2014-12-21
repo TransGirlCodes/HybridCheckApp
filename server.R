@@ -5,25 +5,23 @@ pkg <- c("shiny", "ggplot2", "png", "grid", "gridExtra", "ape")
 library(shiny)
 library(shinyBS)
 
-shinyServer(function(input, output) {
+shinyServer(function(input, output, session) {
   # Require the HybRIDS package.
   require(HybRIDS)
   # Start up a new HybRIDS session.
   hybridsobj <- HybRIDS$new()
-  # Makes sure the DNA sequences are updated.
-  # Reactive so when the DNA sequence is changed, then so is everything that depends on this.
+  
+  # DNA sequence loading.
   updateSequence <- reactive({
     validate(
       need(grepl(".fas", input$fastafile$name) || grepl(".fasta", input$fastafile$name), "Provide a FASTA format sequence file.")
     )
     hybridsobj$inputDNA(input$fastafile$datapath)
+    str(input$fastafile)
   })
   
   output$SeqInfo <- renderText({
     updateSequence()
-    validate(
-      need(hybridsobj$DNA$hasDNA(), "No sequence file is loaded into HybRIDS.")
-    )
     hybridsobj$DNA$htmlSummary()
   })
   
@@ -67,26 +65,31 @@ shinyServer(function(input, output) {
     })
   
   output$tripletgen <- renderUI({
-    updateSequence()
+    updateTripletGenSettings()
     lapply(1:input$numGroups, function(i) {
-      selectInput(inputId=paste0("group", i), label=paste0("Sequence Group ", i), choices = hybridsobj$DNA$getSequenceNames(), multiple=TRUE)
+      selectInput(inputId=paste0("group", i), label=paste0("Sequence Group ", i),
+                  choices = hybridsobj$DNA$getSequenceNames(), multiple = TRUE)
     })
   })
   
   # Server functions for the analyze triplets page.
+  
+  output$TripletToAnalyze <- renderUI({
+    updateTripletGenSettings()
+    selectInput("tripletToAnalyze", 
+                tags$strong("Run / rerun analysis for triplets:"),
+                c("ALL", hybridsobj$triplets$tripletCombinations()),
+                selected = "ALL", multiple = TRUE)
+  })
+  
   output$TripletSelector <- renderUI({
     updateTripletGenSettings()
-    selectInput("tripletSelection", tags$strong("Selected Triplet"), hybridsobj$triplets$tripletCombinations())
+    selectInput("tripletSelection", tags$strong("Selected Triplet"),
+                hybridsobj$triplets$tripletCombinations())
   })
   
   currentTripletSelection <- reactive({
     return(unlist(strsplit(input$tripletSelection, ", ")))
-  })
-  
-  scanSeqSim <- reactive({
-    hybridsobj$setParameters("SSAnalysis", WindowSize = as.integer(input$windowSize),
-                             StepSize = as.integer(input$stepSize))
-    hybridsobj$analyzeSS(currentTripletSelection())
   })
   
   updatePlottingSettings <- reactive({
@@ -111,39 +114,88 @@ shinyServer(function(input, output) {
                              MosaicScale = input$plotMosaicScale)
   })
   
-  
-  findBlocks <- reactive({
-    scanSeqSim()
-    hybridsobj$setParameters("BlockDetection", ManualThresholds = input$manBlockDetectDist,
-                             AutoThresholds = (input$detectionMethod == "no"),
-                             ManualFallback = input$fallbackManual)
-    hybridsobj$findBlocks(currentTripletSelection())
-  })
-  
-  dateBlocks <- reactive({
-    dateanyway <- !input$eliminateinsignificant
-    hybridsobj$setParameters("BlockDating", MutationRate = input$mu, PValue = input$alpha,
-                             BonfCorrection = input$bonf, DateAnyway = dateanyway,
-                             MutationCorrection = input$correctionModel)
-    hybridsobj$dateBlocks(currentTripletSelection())
+  analysis <- reactive({
+    input$analysisGO
+    if(hybridsobj$DNA$hasDNA() && (input$analysisGO != 0)){
+      hybridsobj$setParameters("SSAnalysis", WindowSize = as.integer(isolate(input$windowSize)),
+                               StepSize = as.integer(isolate(input$stepSize)))
+      hybridsobj$setParameters("BlockDetection", ManualThresholds = isolate(input$manBlockDetectDist),
+                               AutoThresholds = (isolate(input$detectionMethod) == "no"),
+                               ManualFallback = isolate(input$fallbackManual))
+      dateanyway <- !isolate(input$eliminateinsignificant)
+      hybridsobj$setParameters("BlockDating", MutationRate = isolate(input$mu), PValue = isolate(input$alpha),
+                               BonfCorrection = isolate(input$bonf), DateAnyway = dateanyway,
+                               MutationCorrection = isolate(input$correctionModel))
+      selections <- strsplit(isolate(input$tripletToAnalyze), ", ")
+      str(selections)
+      tripletsToDo <- hybridsobj$triplets$getTriplets(selections)
+      numToDo <- length(tripletsToDo)
+      prog <- Progress$new(session, min = 1, max = numToDo)
+      prog$set(value = 0, message = "Scanning SS in triplets...")
+      for(i in 1:numToDo){
+        HybRIDS:::scan.similarity(hybridsobj$DNA, tripletsToDo[[i]], hybridsobj$ssAnalysisSettings)
+        prog$set(value = i)
+      }
+      prog$close()
+      prog <- Progress$new(session, min = 1, max = numToDo)
+      prog$set(value = 0, message = "Finding blocks in triplets...")
+      for(i in 1:numToDo){
+        tripletsToDo[[i]]$putativeBlockFind(hybridsobj$blockDetectionSettings)
+        prog$set(value = i)
+      }
+      prog$close()
+      prog <- Progress$new(session, min = 1, max = numToDo)
+      prog$set(value = 0, message = "Dating blocks...")
+      for(i in 1:numToDo){
+        tripletsToDo[[i]]$blockDate(hybridsobj$DNA, hybridsobj$blockDatingSettings)
+        prog$set(value = i)
+      }
+      prog$close() 
+    }
   })
   
   output$barsPlot <- renderPlot({
+    analysis()
     updatePlottingSettings()
-    scanSeqSim()
     print(hybridsobj$plotTriplets(currentTripletSelection(), What="Bars"))
   })
-  
+
   output$linesPlot <- renderPlot({
+    analysis()
     updatePlottingSettings()
-    scanSeqSim()
     print(hybridsobj$plotTriplets(currentTripletSelection(), What="Lines"))
   })
-  
+
   output$blocksTable <- renderDataTable({
-    findBlocks()
-    dateBlocks()
+    analysis()
     hybridsobj$tabulateDetectedBlocks(currentTripletSelection(), Neat=TRUE)
   })
+  
+  output$userBlocksTable <- renderDataTable({
+    hybridsobj$tabulateUserBlocks()
+  })
+  
+  output$saveTable <- downloadHandler(filename = 
+                                        function(){
+                                          paste0(strsplit(input$fastafile$name, ".fas")[1], "_Triplet_",
+                                                 paste(currentTripletSelection(), collapse = ":"), ".csv")
+                                        },
+                                      content =
+                                        function(file){
+                                          write.csv(hybridsobj$tabulateDetectedBlocks(currentTripletSelection(), Neat=TRUE), file)
+                                        }
+  )
+    
+  output$userBlocksSeqSelect <- renderUI({
+    updateSequence()
+    selectInput("seqChoice1", "Select two sequences",
+                hybridsobj$DNA$getSequenceNames(), multiple = TRUE)
+  })
+  
+  output$activeTab <- reactive({
+    return(input$tab)
+  })
+  outputOptions(output, 'activeTab', suspendWhenHidden=FALSE)
+  
   
 })
