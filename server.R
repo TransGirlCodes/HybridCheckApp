@@ -1,13 +1,17 @@
+# Code here makes sure that correct packages required are loaded.
 installed <- installed.packages()
+
 # If the user has HybRIDS installed then all these should be installed anyway.
 pkg <- c("shiny", "ggplot2", "png", "grid", "gridExtra", "ape")
 
 library(shiny)
 library(shinyBS)
 
-shinyServer(function(input, output, session) {
+shinyServer(function(input, output, session){
+  
   # Require the HybRIDS package.
   require(HybRIDS)
+  
   # Start up a new HybRIDS session.
   hybridsobj <- HybRIDS$new()
   
@@ -17,7 +21,6 @@ shinyServer(function(input, output, session) {
       need(grepl(".fas", input$fastafile$name) || grepl(".fasta", input$fastafile$name), "Provide a FASTA format sequence file.")
     )
     hybridsobj$inputDNA(input$fastafile$datapath)
-    str(input$fastafile)
   })
   
   output$SeqInfo <- renderText({
@@ -84,12 +87,8 @@ shinyServer(function(input, output, session) {
   
   output$TripletSelector <- renderUI({
     updateTripletGenSettings()
-    selectInput("tripletSelection", tags$strong("Selected Triplet"),
+    selectInput("tripletSelection", tags$strong("View triplet:"),
                 hybridsobj$triplets$tripletCombinations())
-  })
-  
-  currentTripletSelection <- reactive({
-    return(unlist(strsplit(input$tripletSelection, ", ")))
   })
   
   updatePlottingSettings <- reactive({
@@ -127,7 +126,6 @@ shinyServer(function(input, output, session) {
                                BonfCorrection = isolate(input$bonf), DateAnyway = dateanyway,
                                MutationCorrection = isolate(input$correctionModel))
       selections <- strsplit(isolate(input$tripletToAnalyze), ", ")
-      str(selections)
       tripletsToDo <- hybridsobj$triplets$getTriplets(selections)
       numToDo <- length(tripletsToDo)
       prog <- Progress$new(session, min = 1, max = numToDo)
@@ -157,39 +155,103 @@ shinyServer(function(input, output, session) {
   output$barsPlot <- renderPlot({
     analysis()
     updatePlottingSettings()
-    print(hybridsobj$plotTriplets(currentTripletSelection(), What="Bars"))
+    validate(need(is.character(input$tripletSelection), 
+                  "Triplets to choose from have not been generated yet."))
+    selection <- unlist(strsplit(input$tripletSelection, ", "))
+    validate(need(!hybridsobj$triplets$getTriplets(selection)[[1]]$noScanPerformed(),
+             "Sequence similarity scan has not been performed for this triplet yet."))
+    barsPlot <- hybridsobj$plotTriplets(unlist(strsplit(input$tripletSelection, ", ")), What="Bars")[[1]]
+    print(barsPlot)
   })
 
   output$linesPlot <- renderPlot({
     analysis()
     updatePlottingSettings()
-    print(hybridsobj$plotTriplets(currentTripletSelection(), What="Lines"))
+    validate(need(is.character(input$tripletSelection), 
+                  "Triplets to choose from have not been generated yet."))
+    selection <- unlist(strsplit(input$tripletSelection, ", "))
+    validate(need(!hybridsobj$triplets$getTriplets(selection)[[1]]$noScanPerformed(),
+             "Sequence similarity scan has not been performed for this triplet yet."))
+    linesPlot <- hybridsobj$plotTriplets(selection, What="Lines")[[1]]
+    print(linesPlot)
   })
 
   output$blocksTable <- renderDataTable({
     analysis()
-    hybridsobj$tabulateDetectedBlocks(currentTripletSelection(), Neat=TRUE)
+    validate(need(is.character(input$tripletSelection),
+                  "Triplets to choose from have not been generated yet."))
+    validate(
+      need(!hybridsobj$triplets$getTriplets(
+        unlist(strsplit(input$tripletSelection, ", ")))[[1]]$blocksNotDated(),
+           "Recombinant regions have not been found or dated yet for the selected triplet."))
+    hybridsobj$tabulateDetectedBlocks(unlist(strsplit(input$tripletSelection, ", ")), Neat=TRUE)
   })
   
   output$userBlocksTable <- renderDataTable({
+    updateSequence()
+    clearUserBlocks()
+    addUserBlocks()
+    dateUserBlocks()
     hybridsobj$tabulateUserBlocks()
   })
   
   output$saveTable <- downloadHandler(filename = 
                                         function(){
                                           paste0(strsplit(input$fastafile$name, ".fas")[1], "_Triplet_",
-                                                 paste(currentTripletSelection(), collapse = ":"), ".csv")
+                                                 paste(unlist(strsplit(input$tripletSelection, ", ")), collapse = ":"), ".csv")
                                         },
                                       content =
                                         function(file){
-                                          write.csv(hybridsobj$tabulateDetectedBlocks(currentTripletSelection(), Neat=TRUE), file)
+                                          write.csv(hybridsobj$tabulateDetectedBlocks(unlist(strsplit(input$tripletSelection, ", ")), Neat=TRUE), file)
                                         }
   )
+  
+  output$saveBarPlots <- downloadHandler(filename =
+                                        function(){
+                                          paste0(strsplit(input$fastafile$name, ".fas")[1], "_Triplet_",
+                                                 paste(unlist(strsplit(input$tripletSelection, ", ")), collapse = ":"), "_Bars.png")
+                                        },
+                                        content = 
+                                          function(file){
+                                            selection <- unlist(strsplit(isolate(input$tripletSelection), ", "))
+                                            whichToPlot <- isolate(input$whichPlotToSave)
+                                            if(whichToPlot == "Both"){
+                                              whichToPlot <- c("Bars", "Lines")
+                                            }
+                                            Plot <- hybridsobj$plotTriplets(selection, What = whichToPlot)[[1]]
+                                            ggsave("plot.png", plot = Plot, width = isolate(input$widthSave), height = isolate(input$heightSave),
+                                                   dpi = isolate(input$resSave), units = "in")
+                                            file.copy("plot.png", file, overwrite=TRUE)
+                                          })
     
   output$userBlocksSeqSelect <- renderUI({
     updateSequence()
-    selectInput("seqChoice1", "Select two sequences",
+    selectInput("seqChoice", "Select two sequences",
                 hybridsobj$DNA$getSequenceNames(), multiple = TRUE)
+  })
+  
+  addUserBlocks <- reactive({
+    input$addUBButton
+    validate(need(isolate(input$startPosition) < isolate(input$endPosition), "Start position must be less than the end position."))
+    if(length(isolate(input$seqChoice)) == 2){
+      hybridsobj$addUserBlock(isolate(input$seqChoice), isolate(input$startPosition), isolate(input$endPosition))
+    }
+  })
+  
+  clearUserBlocks <- reactive({
+    input$clearUBButton
+    if(length(isolate(input$seqChoice)) == 2){
+      hybridsobj$clearUserBlocks(isolate(input$seqChoice))
+    }
+  })
+  
+  dateUserBlocks <- reactive({
+    input$dateUBButton
+    dateanyway <- !isolate(input$eliminateinsignificant2)
+    hybridsobj$setParameters("BlockDating", MutationRate = isolate(input$mu2), PValue = isolate(input$alpha2),
+                             BonfCorrection = isolate(input$bonf2), DateAnyway = dateanyway,
+                             MutationCorrection = isolate(input$correctionModel2))
+    hybridsobj$dateUserBlocks()
   })
   
   output$activeTab <- reactive({

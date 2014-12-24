@@ -143,12 +143,16 @@ shinyUI(navbarPage("HybRIDS",
                                                        fluidRow(
                                                          inputPanel(
                                                            h4("Other Settings:"),
-                                                           numericInput("plotMosaicScale", "Number of segments in RGB bars", 500)
+                                                           numericInput("plotMosaicScale", "Number of segments in RGB bars", 500),
+                                                           numericInput("heightSave", "Height of plots when saved to file (inches)", 10),
+                                                           numericInput("widthSave", "Width of plots when saved to file (inches)", 12),
+                                                           numericInput("resSave", "Resolution of plots when saved (dpi)", 300),
+                                                           radioButtons("whichPlotToSave", "Which plot to save?", list(Bars = "Bars", Lines = "Lines", Both = "Both"))
                                                            ))
                                                        )),
                             hr(),
                             h2("View Results:"),
-                            fluidRow(div(inputPanel(uiOutput("TripletSelector"), downloadButton("savePlots", "Save Plots"), downloadButton("saveTable", "Save Table"), align="center"))),
+                            fluidRow(div(inputPanel(uiOutput("TripletSelector"), downloadButton("saveBarPlots", "Save Plots"), downloadButton("saveTable", "Save Table"), align="center"))),
                             br(),
                             fluidRow(column(12,
                             bsCollapse(multiple = FALSE, open = "col1", id = "collapse1",
@@ -173,12 +177,14 @@ shinyUI(navbarPage("HybRIDS",
                               column(4,
                                      inputPanel(
                                        h4("Add or clear user blocks:"),
-                                       uiOutput("userBlocksAdd"),
+                                       uiOutput("userBlocksSeqSelect"),
                                        numericInput("startPosition", "Start of block in BP", value = NULL,
                                                     min = 1),
                                        numericInput("endPosition", "End of block in BP", value = NULL,
-                                                    min = 1)
-                                       
+                                                    min = 1),
+                                       actionButton("addUBButton", "Add user defined block between sequences"),
+                                       actionButton("clearUBButton", "Remove user defined blocks between sequences"),
+                                       actionButton("dateUBButton", "Test and date user defined blocks between sequences")
                                        )),
                               column(4,
                                      inputPanel(
