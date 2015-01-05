@@ -1,16 +1,30 @@
-# Code here makes sure that correct packages required are loaded.
+# Following code makes sure all the dependencies of HybRIDS and HybRIDSapp are loaded and installed.
+# Note it only considered installed/noninstalled - it does not check version numbers.
 installed <- installed.packages()
-
-# If the user has HybRIDS installed then all these should be installed anyway.
-pkg <- c("shiny", "ggplot2", "png", "grid", "gridExtra", "ape")
+# Packages required from R's package manager:
+chooseCRANmirror(ind = 83)
+pkg <- c("devtools", "shiny", "ggplot2", "png", "grid", "gridExtra", "ape", "Rcpp")
+new.pkg <- pkg[!(pkg %in% installed)]
+if(length(new.pkg)){install.packages(new.pkg)}
+if(!("Biostrings" %in% installed)){
+  source("http://bioconductor.org/biocLite.R")
+  biocLite()
+  biocLite("Biostrings")
+}
+if(!("HybRIDS" %in% installed)){
+  library(devtools)
+  install_github("Ward9250/HybRIDS")
+}
+if(!("shinyBS" %in% installed)){
+  library(devtools)
+  install_github("ebailey78/shinyBS")
+}
 
 library(shiny)
 library(shinyBS)
+library(HybRIDS)
 
 shinyServer(function(input, output, session){
-  
-  # Require the HybRIDS package.
-  require(HybRIDS)
   
   # Start up a new HybRIDS session.
   hybridsobj <- HybRIDS$new()
@@ -258,6 +272,5 @@ shinyServer(function(input, output, session){
     return(input$tab)
   })
   outputOptions(output, 'activeTab', suspendWhenHidden=FALSE)
-  
   
 })
