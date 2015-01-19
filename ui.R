@@ -3,8 +3,8 @@ library(shinyBS)
 
 shinyUI(navbarPage("HybRIDS",
                    
-                   tabPanel("Sequence Data",
-                            h1("Input DNA sequence file."),hr(),
+                   tabPanel("Sequence Data and Populations",
+                            h1("Input DNA sequence file."), hr(),
                             p("Upload your FASTA file containing sequences from your different populations to get started."),
                             p("Note: Duplicate Sequences will be removed."), hr(),
                             div(align='center',
@@ -17,9 +17,70 @@ shinyUI(navbarPage("HybRIDS",
                                       )
                             )),
                             hr(),
-                            htmlOutput("SeqInfo")
-                            ),
+                            fluidRow(
+                              column(6, htmlOutput("SeqInfo")),
+                              column(6, h2("Populations:"),
+                                     checkboxInput("oneSeqOnePop", "Define populations."),
+                                     conditionalPanel("input.oneSeqOnePop",
+                                                      numericInput("numPops", "How many populations?", value = 4, min = 1),
+                                                      uiOutput("populationsGen"),
+                                                      actionButton(inputId = "setPops", label = "Set Populations")
+                                     )
+                              )
+                            )
+                   ),
                    
+                   tabPanel("Four Taxon Tests",
+                            h1("Setup and Run Four Taxon Tests"), hr(),
+                            p("Four taxon tests accept four sequences or populations and calculates Patterson's D statistic.
+                            The four taxon test is also known as the ABBA-BABA test. ABBA and BABA are the names given to two distinctive patterns of mutation:"), 
+                            p("The ABBA SNP pattern means that P1 has the ancestral state at that site, whereas P2 and P3 have a derived state.
+                            The BABA pattern means that P1 and P3 share the derived state, and P2 and the ancestral P4 are the same state."),
+                            p("These two patterns are illustrated in the images below:"),
+                            fluidRow(
+                              column(6,
+                                     h4("The ABBA SNP pattern:"),
+                                     imageOutput("ABBAtree")
+                                     ),
+                              column(6,
+                                     h4("The BABA SNP pattern:"),
+                                     imageOutput("BABAtree")
+                                     )),
+                            p("Notice in the images the test assumes an explicit evolutionary history: P1 and P2 coalesce first, and P4 is the ancestor / outgroup."),
+                            p("Under a scenario of no introgression or no ancestral mutation, for all the two-state mutations in four taxa,
+                               the two mutation patterns ABBA and BABA are expected to be about equal and Patterson's D is expected to be zero."),
+                            p("Deviations from this exectation suggest introgression and hybridisation."),
+                            hr(),
+                            bsCollapse(
+                              bsCollapsePanel("Setup Tests:",
+                                              h2("Setup Tests:"),
+                                              fluidRow(
+                                                column(8,
+                                                       h4("Test Parameters:"),
+                                                       numericInput("fttBlockSize", "Block Size:", NA),
+                                                       numericInput("fttNumberOfBlocks", "Number of Blocks:", NA),
+                                                       hr(),
+                                                       h4("Taxa Combinations:"),
+                                                       p("Define combinations of 4 taxa to be tested."),
+                                                       checkboxInput("fttAutoSets", "Automatically generate?"),
+                                                       conditionalPanel("!input.fttAutoSets",
+                                                                        numericInput("fttNumCombos", "Number of taxa combos:", 1),
+                                                                        uiOutput("fttGen")
+                                                       )
+                                                ),
+                                                column(4,
+                                                       inputPanel(
+                                                         actionButton("setCombinations", "Set Combinations"),
+                                                         actionButton("runTests", "Run Tests")
+                                                       ),
+                                                       strong(em("Combinations that will be run:")),
+                                                       htmlOutput("generatedCombos")
+                                                )
+                                              )
+                              )              
+                            )
+                   ),
+
                    tabPanel("Specify Triplets to Analyze",
                             h1("Specify sequence combinations to scan."), hr(),
                             fluidRow(column(6,
