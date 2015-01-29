@@ -22,14 +22,15 @@
 # 
 # library(shiny)
 # # library(shinyBS)
-# library(shinydashboard)
-# library(HybRIDS)
+library(shinydashboard)
+library(HybRIDS)
 
 
 
 
 
 function(input, output, session){
+  
   hybridsobj <- HybRIDS$new()
   
   updateSequence <- reactive({
@@ -84,11 +85,12 @@ function(input, output, session){
   })
   
   output$popDetails <- renderUI({
+    updateSequence()
     updatePopulations()
     popNames <- hybridsobj$DNA$namesOfPopulations()
     validate(need(hybridsobj$DNA$hasPopulations(), "No populations defined."))
     lapply(1:hybridsobj$DNA$numberOfPopulations(), function(i){
-      fluidRow(box(title = popNames[i], solidHeader = TRUE,
+      fluidRow(box(title = popNames[i], solidHeader = TRUE, width = 12,
                    paste0(hybridsobj$DNA$Populations[[i]], collapse = ", ")
       ))
     }) 
@@ -109,148 +111,119 @@ function(input, output, session){
     })
   })
   
+  output$ABBAtree <- renderImage({
+    width  <- session$clientData$output_ABBAtree_width
+    height <- session$clientData$output_ABBAtree_height
+    pixelratio <- session$clientData$pixelratio
+    outfile <- tempfile(fileext='.png')
+    png(outfile, width=width*pixelratio, height=height*pixelratio,
+        res=72*pixelratio)
+    plot(read.tree(text="(((P1,P2),P3),P4);"))
+    nodelabels("A", c(1,4), adj = c(-2.5, 0.5), bg = "red", col="white")
+    nodelabels("B", c(2,3), adj = c(-2.5, 0.5), bg = "blue", col="white")
+    dev.off()
+    list(src = outfile,
+         width = width,
+         height = height,
+         alt = "This is alternate text")}, deleteFile = TRUE)
+  
+  output$BABAtree <- renderImage({
+    width  <- session$clientData$output_BABAtree_width
+    height <- session$clientData$output_BABAtree_height
+    pixelratio <- session$clientData$pixelratio
+    outfile <- tempfile(fileext='.png')
+    png(outfile, width=width*pixelratio, height=height*pixelratio,
+        res=72*pixelratio)
+    plot(read.tree(text="(((P1,P2),P3),P4);"))
+    nodelabels("A", c(2,4), adj = c(-2.5, 0.5), bg = "red", col="white")
+    nodelabels("B", c(1,3), adj = c(-2.5, 0.5), bg = "blue", col="white")
+    dev.off()
+    list(src = outfile,
+         width = width,
+         height = height,
+         alt = "This is alternate text")}, deleteFile = TRUE)
+  
+  output$fttGen <- renderUI({
+    updateSequence()
+    updatePopulations()
+    validate(need(!is.na(input$fttNumCombos), "Enter a number of taxa combos to analyse."))
+    validate(need(length(hybridsobj$DNA$Populations) >= 4, "You need 4 or more populations defined."))
+    fluidRow(
+      column(3,
+             lapply(1:input$fttNumCombos, function(i) {
+               selectInput(inputId=paste0("P1", i), label = "P1",
+                           choices = hybridsobj$DNA$namesOfPopulations())
+             })),
+      column(3,
+             lapply(1:input$fttNumCombos, function(i) {
+               selectInput(inputId=paste0("P2", i), label = "P2",
+                           choices = hybridsobj$DNA$namesOfPopulations())
+             })),
+      column(3,
+             lapply(1:input$fttNumCombos, function(i) {
+               selectInput(inputId=paste0("P3", i), label = "P3",
+                           choices = hybridsobj$DNA$namesOfPopulations())
+             })),
+      column(3,
+             lapply(1:input$fttNumCombos, function(i) {
+               selectInput(inputId=paste0("A", i), label = "P4",
+                           choices = hybridsobj$DNA$namesOfPopulations())
+             }))
+    )
+  })
+  
+  updateTaxaCombos <- reactive({
+    input$setCombinations
+    if(isolate(input$fttAutoSets)){
+      hybridsobj$prepareFourTaxonTests()
+    } else {
+      combos <- lapply(1:isolate(input$fttNumCombos), function(i){
+        c(P1 = isolate(input[[paste0("P1", i)]]), P2 = isolate(input[[paste0("P2", i)]]),
+          P3 = isolate(input[[paste0("P3", i)]]), A = isolate(input[[paste0("A", i)]]))
+      })
+      lapply(combos)
+      hybridsobj$prepareFourTaxonTests(combos)
+    }
+  })
+  
+  output$generatedCombos <- renderUI({
+    updateTaxaCombos()
+    lapply(hybridsobj$FTTmodule$results, function(x){
+      box(title = NULL, width = 12,
+          paste0("P1: ", x$P1, ",\nP2: ", x$P2, ",\nP3: ", x$P3, ",\nA: ", x$A))
+    })
+  })
+  
+  output$combosToAnalyze <- renderUI({
+    updateTaxaCombos()
+    validate(need(hybridsobj$FTTmodule$hasTaxaCombos(), "Set taxa combinations to test."))
+    column(width = 12,
+           selectInput("fttToAnalyze", 
+                       tags$strong("Run / rerun four taxon test for combination:"),
+                       c("NOT.TESTED", "ALL", "TESTED", hybridsobj$FTTmodule$printAllNames()),
+                       selected = "ALL", multiple = TRUE),
+           numericInput("fttBlockSize", "Block Size:", NA),
+           numericInput("fttNumberOfBlocks", "Number of Blocks:", NA),
+           actionButton("runFTTs", "Run Tests")
+    )
+  })
+  
+  doFTTTests <- reactive({
+    updateTaxaCombos()
+    
+    
+  })
+  
   
   
   
 }
 
 
+ 
 
-
-
-
-
-# 
-# shinyServer(function(input, output, session){
-#   
-#   # Start up a new HybRIDS session.
-#   hybridsobj <- HybRIDS$new()
-#   
-#   # DNA sequence loading.
-#   updateSequence <- reactive({
-#     validate(
-#       need(grepl(".fas", input$fastafile$name) || grepl(".fasta", input$fastafile$name), "Provide a FASTA format sequence file.")
-#     )
-#     hybridsobj$inputDNA(input$fastafile$datapath)
-#   })
-#   
-#   updatePopulations <- reactive({
-#     input$setPops
-#     if(!isolate(input$oneSeqOnePop)){
-#       hybridsobj$setPopulations(NULL)
-#     } else {
-#       nameSel <- unlist(lapply(1:isolate(input$numPops), function(i) paste0("PopulationName", i)))
-#       popSel <- unlist(lapply(1:isolate(input$numPops), function(i) paste0("Population", i)))
-#       populations <- setNames(object = lapply(popSel, function(i) isolate(input[[i]])), 
-#                               unlist(lapply(nameSel, function(i) isolate(input[[i]]))))
-#       hybridsobj$setPopulations(populations)
-#     }
-#   })
-#   
-#   output$SeqInfo <- renderText({
-#     updateSequence()
-#     updatePopulations()
-#     validate(need(hybridsobj$DNA$hasDNA(), "Provide a FASTA format alignment to begin."))
-#     hybridsobj$DNA$htmlSummary()
-#   })
-#   
-#   output$populationsGen <- renderUI({
-#     updateSequence()
-#     validate(need(!is.na(input$numPops), "Enter a number of populations."))
-#     lapply(1:input$numPops, function(i) {
-#       fluidRow(
-#         column(6, textInput(inputId=paste0("PopulationName", i), label=paste0("Population Name"))),
-#         column(6,
-#                selectInput(inputId=paste0("Population", i), label=paste0("Sequences"),
-#                            choices = hybridsobj$DNA$getSequenceNames(), multiple = TRUE) 
-#         )
-#       )
-#     })
-#   })
-#                     
-#                     
-#   
-#   
-#   # ABBA-BABA section
-#   
-#   output$ABBAtree <- renderImage({
-#     width  <- session$clientData$output_ABBAtree_width
-#     height <- session$clientData$output_ABBAtree_height
-#     pixelratio <- session$clientData$pixelratio
-#     outfile <- tempfile(fileext='.png')
-#     png(outfile, width=width*pixelratio, height=height*pixelratio,
-#         res=72*pixelratio)
-#     plot(read.tree(text="(((P1,P2),P3),P4);"))
-#     nodelabels("A", c(1,4), adj = c(-2.5, 0.5), bg = "red", col="white")
-#     nodelabels("B", c(2,3), adj = c(-2.5, 0.5), bg = "blue", col="white")
-#     dev.off()
-#     list(src = outfile,
-#          width = width,
-#          height = height,
-#          alt = "This is alternate text")}, deleteFile = TRUE)
-#              
-#   output$BABAtree <- renderImage({
-#     width  <- session$clientData$output_BABAtree_width
-#     height <- session$clientData$output_BABAtree_height
-#     pixelratio <- session$clientData$pixelratio
-#     outfile <- tempfile(fileext='.png')
-#     png(outfile, width=width*pixelratio, height=height*pixelratio,
-#         res=72*pixelratio)
-#     plot(read.tree(text="(((P1,P2),P3),P4);"))
-#     nodelabels("A", c(2,4), adj = c(-2.5, 0.5), bg = "red", col="white")
-#     nodelabels("B", c(1,3), adj = c(-2.5, 0.5), bg = "blue", col="white")
-#     dev.off()
-#     list(src = outfile,
-#          width = width,
-#          height = height,
-#          alt = "This is alternate text")}, deleteFile = TRUE)
-#   
-#   output$fttGen <- renderUI({
-#     updateSequence()
-#     updatePopulations()
-#     validate(need(!is.na(input$fttNumCombos), "Enter a number of taxa combos to analyse."))
-#     validate(need(length(hybridsobj$DNA$Populations) >= 4, "You need 4 or more populations defined."))
-#     fluidRow(
-#       column(3,
-#              lapply(1:input$fttNumCombos, function(i) {
-#                selectInput(inputId=paste0("P1", i), label = "P1",
-#                            choices = hybridsobj$DNA$namesOfPopulations())
-#              })),
-#       column(3,
-#              lapply(1:input$fttNumCombos, function(i) {
-#                selectInput(inputId=paste0("P2", i), label = "P2",
-#                            choices = hybridsobj$DNA$namesOfPopulations())
-#              })),
-#       column(3,
-#              lapply(1:input$fttNumCombos, function(i) {
-#                selectInput(inputId=paste0("P3", i), label = "P3",
-#                            choices = hybridsobj$DNA$namesOfPopulations())
-#              })),
-#       column(3,
-#              lapply(1:input$fttNumCombos, function(i) {
-#                selectInput(inputId=paste0("A", i), label = "P4",
-#                            choices = hybridsobj$DNA$namesOfPopulations())
-#              }))
-#     )
-#   })
-#   
-#   updateTaxaCombos <- reactive({
-#     input$setCombinations
-#     if(isolate(input$fttAutoSets)){
-#       hybridsobj$prepareFourTaxonTests()
-#     } else {
-#       combos <- lapply(1:isolate(input$fttNumCombos), function(i){
-#         c(P1 = isolate(input[[paste0("P1", i)]]), P2 = isolate(input[[paste0("P2", i)]]),
-#           P3 = isolate(input[[paste0("P3", i)]]), A = isolate(input[[paste0("A", i)]]))
-#       })
-#       hybridsobj$prepareFourTaxonTests(combos)
-#     }
-#   })
-#   
-#   output$generatedCombos <- renderText({
-#     updateTaxaCombos()
-#     paste(hybridsobj$FTTmodule$printAllNames(), collapse = "\n\n")
-#   })
+  
+  
 #   
 #   
 #   
