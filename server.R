@@ -25,7 +25,6 @@
 library(shinydashboard)
 library(HybRIDS)
 
-
 comboChoiceSorter <- function(inputs){
   return(lapply(inputs, function(x){
     if(x == "NOT.TESTED" || x == "TESTED" || x == "ALL"){
@@ -129,11 +128,11 @@ function(input, output, session){
     height <- session$clientData$output_ABBAtree_height
     pixelratio <- session$clientData$pixelratio
     outfile <- tempfile(fileext='.png')
-    png(outfile, width=width*pixelratio, height=height*pixelratio,
-        res=72*pixelratio)
-    plot(read.tree(text="(((P1,P2),P3),P4);"))
-    nodelabels("A", c(1,4), adj = c(-2.5, 0.5), bg = "red", col="white")
-    nodelabels("B", c(2,3), adj = c(-2.5, 0.5), bg = "blue", col="white")
+    png(outfile, width = width * pixelratio, height = height * pixelratio,
+        res = 72 * pixelratio)
+    plot(ape:::read.tree(text="(((P1,P2),P3),P4);"))
+    ape:::nodelabels("A", c(1,4), adj = c(-2.5, 0.5), bg = "red", col="white")
+    ape:::nodelabels("B", c(2,3), adj = c(-2.5, 0.5), bg = "blue", col="white")
     dev.off()
     list(src = outfile,
          width = width,
@@ -147,9 +146,9 @@ function(input, output, session){
     outfile <- tempfile(fileext='.png')
     png(outfile, width=width*pixelratio, height=height*pixelratio,
         res=72*pixelratio)
-    plot(read.tree(text="(((P1,P2),P3),P4);"))
-    nodelabels("A", c(2,4), adj = c(-2.5, 0.5), bg = "red", col="white")
-    nodelabels("B", c(1,3), adj = c(-2.5, 0.5), bg = "blue", col="white")
+    plot(ape:::read.tree(text="(((P1,P2),P3),P4);"))
+    ape:::nodelabels("A", c(2,4), adj = c(-2.5, 0.5), bg = "red", col="white")
+    ape:::nodelabels("B", c(1,3), adj = c(-2.5, 0.5), bg = "blue", col="white")
     dev.off()
     list(src = outfile,
          width = width,
@@ -256,7 +255,7 @@ function(input, output, session){
               valueBox(x$blockLength, "Block Length", width = 3, color = "red"),
               valueBox(round(x$ABBA, 5), "ABBA", width = 3, color = "orange"),
               valueBox(round(x$BABA, 5), "BABA", width = 3, color = "yellow"),
-              valueBox(round(x$X2_P, 5), "P-Value", width = 3, color = "green"),
+              valueBox(round(x$X2_P, 10), "P-Value", width = 3, color = "green"),
               valueBox(round(x$D_jEstimate, 5), "D", width = 3, color = "blue"),
               valueBox(round(x$Fd_1DD4_jEstimate, 5), "Fd(P2, P3)", width = 3, color = "navy"),
               valueBox(round(x$Fd_D2D4_jEstimate, 5), "Fd(P1, P3)", width = 3, color = "navy"),
