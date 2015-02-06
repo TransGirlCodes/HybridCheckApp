@@ -1,27 +1,20 @@
 # # Following code makes sure all the dependencies of HybRIDS and HybRIDSapp are loaded and installed.
 # # Note it only considered installed/noninstalled - it does not check version numbers.
-# installed <- installed.packages()
+installed <- installed.packages()
 # # Packages required from R's package manager:
-# chooseCRANmirror(ind = 83)
-# pkg <- c("devtools", "shiny", "ggplot2", "png", "grid", "gridExtra", "ape", "Rcpp")
-# new.pkg <- pkg[!(pkg %in% installed)]
-# if(length(new.pkg)){install.packages(new.pkg)}
-# if(!("Biostrings" %in% installed)){
-#   source("http://bioconductor.org/biocLite.R")
-#   biocLite()
-#   biocLite("Biostrings")
-# }
-# if(!("HybRIDS" %in% installed)){
-#   library(devtools)
-#   install_github("Ward9250/HybRIDS")
-# }
-# # if(!("shinyBS" %in% installed)){
-# #   library(devtools)
-# #   install_github("ebailey78/shinyBS")
-# # }
-# 
-# library(shiny)
-# # library(shinyBS)
+chooseCRANmirror(ind = 83)
+pkg <- c("devtools", "shiny", "ggplot2", "png", "grid", "gridExtra", "ape", "Rcpp")
+new.pkg <- pkg[!(pkg %in% installed)]
+if(length(new.pkg)){install.packages(new.pkg)}
+if(!("Biostrings" %in% installed)){
+  source("http://bioconductor.org/biocLite.R")
+  biocLite()
+  biocLite("Biostrings")
+}
+if(!("HybRIDS" %in% installed)){
+  library(devtools)
+  install_github("Ward9250/HybRIDS")
+}
 library(shinydashboard)
 library(HybRIDS)
 
@@ -38,7 +31,6 @@ comboChoiceSorter <- function(inputs){
     }
   }))
 }
-
 
 function(input, output, session){
   
@@ -246,24 +238,30 @@ function(input, output, session){
     doFTTests()
     selectedTests <- hybridsobj$FTTmodule$getFTTs(comboChoiceSorter(input$fttView))
     lapply(selectedTests, function(x){
-      if(!x$noTestPerformed())
+      if(!x$noTestPerformed()){
         box(title = paste0("P1: ", x$P1, ", P2: ", x$P2, ", P3: ", x$P3,
                            ", P4: ", x$A), width = 12, solidHeader = TRUE,
             status = "primary", 
             fluidRow(
-              valueBox(x$numBlocks, "Number of Blocks", width = 3, color = "maroon"),
-              valueBox(x$blockLength, "Block Length", width = 3, color = "red"),
-              valueBox(round(x$ABBA, 5), "ABBA", width = 3, color = "orange"),
-              valueBox(round(x$BABA, 5), "BABA", width = 3, color = "yellow"),
-              valueBox(round(x$X2_P, 10), "P-Value", width = 3, color = "green"),
-              valueBox(round(x$D_jEstimate, 5), "D", width = 3, color = "blue"),
-              valueBox(round(x$Fd_1DD4_jEstimate, 5), "Fd(P2, P3)", width = 3, color = "navy"),
-              valueBox(round(x$Fd_D2D4_jEstimate, 5), "Fd(P1, P3)", width = 3, color = "navy"),
-              valueBox(round(x$D_jZ, 5), "Z score for D", width = 3, color = "purple"),
-              valueBox(round(x$Fd_1DD4_jZ, 5), "Z score for Fd(P2, P3)", width = 3, color = "purple"),
-              valueBox(round(x$Fd_D2D4_jZ, 5), "Z score for Fd(P1, P3)", width = 3, color = "purple")
+              #               valueBox(x$numBlocks, "Number of Blocks", width = 3, color = "maroon"),
+              #               valueBox(x$blockLength, "Block Length", width = 3, color = "red"),
+              box(title = "Global Stats", status = "primary", width = 12,
+                  valueBox(round(x$ABBA, 5), "ABBA", width = 3, color = "orange"),
+                  valueBox(round(x$BABA, 5), "BABA", width = 3, color = "yellow"),
+                  valueBox(round(x$X2_P, 10), "P-Value", width = 3, color = "green"),
+                  valueBox(round(x$D_jEstimate, 5), "D", width = 3, color = "blue"),
+                  valueBox(round(x$Fd_1DD4_jEstimate, 5), "Fd(P2, P3)", width = 3, color = "navy"),
+                  valueBox(round(x$Fd_D2D4_jEstimate, 5), "Fd(P1, P3)", width = 3, color = "navy"),
+                  valueBox(round(x$D_jZ, 5), "Z score for D", width = 3, color = "purple"),
+                  valueBox(round(x$Fd_1DD4_jZ, 5), "Z score for Fd(P2, P3)", width = 3, color = "purple"),
+                  valueBox(round(x$Fd_D2D4_jZ, 5), "Z score for Fd(P1, P3)", width = 3, color = "purple")
+              ),
+              box(title = "Jack-knifed segment stats", status = "warning", width = 12,
+                  "Hi"
+              )
             )
         )
+      }
     })
   })
   
