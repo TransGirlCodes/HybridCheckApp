@@ -9,12 +9,14 @@ if(length(new.pkg)){install.packages(new.pkg)}
 if(!("Biostrings" %in% installed)){
   source("http://bioconductor.org/biocLite.R")
   biocLite()
+  biocLite("IRanges")
   biocLite("Biostrings")
 }
 if(!("HybRIDS" %in% installed)){
   library(devtools)
   install_github("Ward9250/HybRIDS")
 }
+
 library(shinydashboard)
 library(HybRIDS)
 
@@ -239,25 +241,40 @@ function(input, output, session){
     selectedTests <- hybridsobj$FTTmodule$getFTTs(comboChoiceSorter(input$fttView))
     lapply(selectedTests, function(x){
       if(!x$noTestPerformed()){
-        box(title = paste0("P1: ", x$P1, ", P2: ", x$P2, ", P3: ", x$P3,
-                           ", P4: ", x$A), width = 12, solidHeader = TRUE,
+        testName <- paste0("P1: ", x$P1, ", P2: ", x$P2, ", P3: ", x$P3,
+                           ", P4: ", x$A)
+        tableName <- paste0("table_", x$P1, x$P2, x$P3, x$A)
+        table <- x$table[, c("BlockStart", "BlockEnd",
+                              "S", "numBinomialP",
+                              "ABBA", "BABA", "D", "Fd_1DD4_D0", "Fd_D2D4_D0",
+                              "blockFraction", "scaledPseudoD", "scaledPseudoFd_1DD4",
+                              "scaledPseudoFd_D2D4")]
+        colnames(table) <- c("BlockStart", "BlockEnd", "S", "BinomP", "ABBA", "BABA",
+                             "D", "Fd:P2,P3", "Fd:P1,P3", "BlockFraction", "PseudoD",
+                             "PseudoFd:P2,P3", "PeudoFd:P1,P3")
+        table[is.na(table)] <- 0
+        output[[tableName]] <- renderTable(table)
+        box(title = testName, width = 12, solidHeader = TRUE,
             status = "primary", 
             fluidRow(
-              #               valueBox(x$numBlocks, "Number of Blocks", width = 3, color = "maroon"),
-              #               valueBox(x$blockLength, "Block Length", width = 3, color = "red"),
               box(title = "Global Stats", status = "primary", width = 12,
-                  valueBox(round(x$ABBA, 5), "ABBA", width = 3, color = "orange"),
-                  valueBox(round(x$BABA, 5), "BABA", width = 3, color = "yellow"),
-                  valueBox(round(x$X2_P, 10), "P-Value", width = 3, color = "green"),
-                  valueBox(round(x$D_jEstimate, 5), "D", width = 3, color = "blue"),
-                  valueBox(round(x$Fd_1DD4_jEstimate, 5), "Fd(P2, P3)", width = 3, color = "navy"),
-                  valueBox(round(x$Fd_D2D4_jEstimate, 5), "Fd(P1, P3)", width = 3, color = "navy"),
-                  valueBox(round(x$D_jZ, 5), "Z score for D", width = 3, color = "purple"),
-                  valueBox(round(x$Fd_1DD4_jZ, 5), "Z score for Fd(P2, P3)", width = 3, color = "purple"),
-                  valueBox(round(x$Fd_D2D4_jZ, 5), "Z score for Fd(P1, P3)", width = 3, color = "purple")
+                  fluidRow(
+                    valueBox(round(x$ABBA, 2), "ABBA", width = 3, color = "orange"),
+                    valueBox(round(x$BABA, 2), "BABA", width = 3, color = "yellow"),
+                    valueBox(round(x$X2_P, 10), "P-Value", width = 3, color = "green"),
+                    valueBox(round(x$Observed_D, 5), "D", width = 3, color = "blue"),
+                    valueBox(round(x$D_jEstimate, 5), "D (Jackknifed)", width = 3, color = "blue"),
+                    valueBox(round(x$Observed_Fd_1DD4, 5), "Fd(P2, P3)", width = 3, color = "navy"),
+                    valueBox(round(x$Fd_1DD4_jEstimate, 5), "Fd(P2, P3) (Jackknifed)", width = 3, color = "navy"),
+                    valueBox(round(x$Observed_Fd_D2D4, 5), "Fd(P1, P3)", width = 3, color = "navy"),
+                    valueBox(round(x$Fd_D2D4_jEstimate, 5), "Fd(P1, P3) (Jackknifed)", width = 3, color = "navy"),
+                    valueBox(round(x$D_jZ, 5), "Z score for D", width = 3, color = "purple"),
+                    valueBox(round(x$Fd_1DD4_jZ, 5), "Z score for Fd(P2, P3)", width = 3, color = "purple"),
+                    valueBox(round(x$Fd_D2D4_jZ, 5), "Z score for Fd(P1, P3)", width = 3, color = "purple")
+                  )
               ),
               box(title = "Jack-knifed segment stats", status = "warning", width = 12,
-                  "Hi"
+                  tableOutput(tableName)
               )
             )
         )
@@ -306,7 +323,7 @@ function(input, output, session){
     updateTripletGenSettings()
     selectInput("tripletToAnalyze", 
                 tags$strong("Run / rerun analysis for triplets:"),
-                c("ALL", hybridsobj$triplets$tripletCombinations()),
+                c("ALL", hybridsobj$comparrisonSettings$printAcceptedCombinations()),
                 selected = "ALL", multiple = TRUE)
   })
   
@@ -345,6 +362,7 @@ function(input, output, session){
                                BonfCorrection = isolate(input$bonf), DateAnyway = dateanyway,
                                MutationCorrection = isolate(input$correctionModel))
       selections <- strsplit(isolate(input$tripletToAnalyze), ", ")
+      hybridsobj$triplets$generateTriplets(hybridsobj$DNA, hybridsobj$comparrisonSettings, hybridsobj$filesDirectory)
       tripletsToDo <- hybridsobj$triplets$getTriplets(selections)
       numToDo <- length(tripletsToDo)
       prog <- Progress$new(session, min = 1, max = numToDo)
@@ -372,7 +390,7 @@ function(input, output, session){
   })
   
   output$TripletSelector <- renderUI({
-    updateTripletGenSettings()
+    analysis()
     selectInput("tripletSelection", tags$strong("View triplet:"),
                 hybridsobj$triplets$tripletCombinations())
   })
@@ -413,13 +431,15 @@ function(input, output, session){
       strsplit(input$tripletSelection, ", ")), Neat=TRUE)[, c(-1, -3, -6, -7)]
   })
   
-  output$userBlocksTable <- renderDataTable({
-    updateSequence()
-    clearUserBlocks()
-    addUserBlocks()
-    dateUserBlocks()
-    hybridsobj$tabulateUserBlocks()
-  })
+  output$saveFTT <- downloadHandler(filename = 
+                                        function(){
+                                          paste0(strsplit(input$fastafile$name, ".fas")[1], "_FTT.csv")
+                                        },
+                                      content =
+                                        function(file){
+                                          write.csv(hybridsobj$tabulateFourTaxonTests(unlist(strsplit(input$combosToView, ", "))), file)
+                                        }
+  )
   
   output$saveTable <- downloadHandler(filename = 
                                         function(){
@@ -473,11 +493,18 @@ function(input, output, session){
   
   dateUserBlocks <- reactive({
     input$dateUBButton
-    dateanyway <- !isolate(input$eliminateinsignificant2)
     hybridsobj$setParameters("BlockDating", MutationRate = isolate(input$mu2), PValue = isolate(input$alpha2),
-                             BonfCorrection = isolate(input$bonf2), DateAnyway = dateanyway,
+                             BonfCorrection = isolate(input$bonf2), DateAnyway = !isolate(input$eliminateinsignificant2),
                              MutationCorrection = isolate(input$correctionModel2))
     hybridsobj$dateUserBlocks()
+  })
+  
+  output$userBlocksTable <- renderDataTable({
+    updateSequence()
+    clearUserBlocks()
+    addUserBlocks()
+    dateUserBlocks()
+    hybridsobj$tabulateUserBlocks()
   })
   
 }

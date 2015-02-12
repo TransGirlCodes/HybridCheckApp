@@ -104,6 +104,8 @@ body <- dashboardBody(
           fluidRow(
             box(title = "Four Taxon Test Results", solidHeader = TRUE,
                 status = "info", width = 12, fluidRow(uiOutput("combosToView")),
+                downloadButton("saveFTT", "Save Test Results to CSV"),
+                br(),br(),
                 fluidRow(uiOutput("fttResults"))
             )
           )
@@ -116,7 +118,7 @@ body <- dashboardBody(
                              c("Generate triplets based on four taxon test results" = 'ftt',
                                "Generate triplets to scan for recombination between populations" = 'pop')),
                 checkboxInput("distancebased", "Raw p-distance based"),
-                conditionalPanel(condition = "input.fftOrPops == 'pop'",
+                conditionalPanel(condition = "input.fttOrPops == 'pop'",
                                  radioButtons("partitionStrictness", "How many sequences from the same group are allowed in a triplet?",
                                               c("One" = 1L,
                                                 "Two" = 2L), selected=2L)),
