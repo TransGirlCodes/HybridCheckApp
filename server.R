@@ -1,21 +1,3 @@
-# # Following code makes sure all the dependencies of HybRIDS and HybRIDSapp are loaded and installed.
-# # Note it only considered installed/noninstalled - it does not check version numbers.
-installed <- installed.packages()
-# # Packages required from R's package manager:
-chooseCRANmirror(ind = 83)
-pkg <- c("devtools", "shiny", "ggplot2", "png", "grid", "gridExtra", "ape", "Rcpp")
-new.pkg <- pkg[!(pkg %in% installed)]
-if(length(new.pkg)){install.packages(new.pkg)}
-if(!("Biostrings" %in% installed)){
-  source("http://bioconductor.org/biocLite.R")
-  biocLite()
-  biocLite("IRanges")
-  biocLite("Biostrings")
-}
-if(!("HybRIDS" %in% installed)){
-  library(devtools)
-  install_github("Ward9250/HybRIDS")
-}
 
 library(shinydashboard)
 library(HybRIDS)
