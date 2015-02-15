@@ -1,7 +1,7 @@
-# Following code makes sure all the dependencies of HybRIDS and HybRIDSapp are loaded and installed.
-# Note it only considered installed/noninstalled - it does not check version numbers.
+# # Following code makes sure all the dependencies of HybRIDS and HybRIDSapp are loaded and installed.
+# # Note it only considered installed/noninstalled - it does not check version numbers.
 installed <- installed.packages()
-# Packages required from R's package manager:
+# # Packages required from R's package manager:
 chooseCRANmirror(ind = 83)
 pkg <- c("devtools", "shiny", "ggplot2", "png", "grid", "gridExtra", "ape", "Rcpp")
 new.pkg <- pkg[!(pkg %in% installed)]
@@ -9,56 +9,102 @@ if(length(new.pkg)){install.packages(new.pkg)}
 if(!("Biostrings" %in% installed)){
   source("http://bioconductor.org/biocLite.R")
   biocLite()
+  biocLite("IRanges")
   biocLite("Biostrings")
 }
 if(!("HybRIDS" %in% installed)){
   library(devtools)
   install_github("Ward9250/HybRIDS")
 }
-if(!("shinyBS" %in% installed)){
-  library(devtools)
-  install_github("ebailey78/shinyBS")
-}
 
-library(shiny)
-library(shinyBS)
+library(shinydashboard)
 library(HybRIDS)
 
-shinyServer(function(input, output, session){
+comboChoiceSorter <- function(inputs){
+  return(lapply(inputs, function(x){
+    if(x == "NOT.TESTED" || x == "TESTED" || x == "ALL"){
+      return(x)
+    } else {
+      chars <- unlist(
+        strsplit(
+          unlist(strsplit(x, split = ", ")),
+          ": "))
+      return(c(chars[2], chars[4], chars[6], chars[8]))
+    }
+  }))
+}
+
+function(input, output, session){
   
-  # Start up a new HybRIDS session.
   hybridsobj <- HybRIDS$new()
   
-  # DNA sequence loading.
   updateSequence <- reactive({
-    validate(
-      need(grepl(".fas", input$fastafile$name) || grepl(".fasta", input$fastafile$name), "Provide a FASTA format sequence file.")
-    )
-    hybridsobj$inputDNA(input$fastafile$datapath)
+    if(!is.null(input$fastafile$datapath) && (grepl(".fas", input$fastafile$name) || grepl(".fasta", input$fastafile$name)))
+      hybridsobj$inputDNA(input$fastafile$datapath)
   })
   
   updatePopulations <- reactive({
     input$setPops
-    if(!isolate(input$oneSeqOnePop)){
-      hybridsobj$setPopulations(NULL)
-    } else {
-      nameSel <- unlist(lapply(1:isolate(input$numPops), function(i) paste0("PopulationName", i)))
-      popSel <- unlist(lapply(1:isolate(input$numPops), function(i) paste0("Population", i)))
-      populations <- setNames(object = lapply(popSel, function(i) isolate(input[[i]])), 
-                              unlist(lapply(nameSel, function(i) isolate(input[[i]]))))
-      hybridsobj$setPopulations(populations)
+    if(hybridsobj$DNA$hasDNA()){
+      if(!isolate(input$oneSeqOnePop)){
+        hybridsobj$setPopulations(NULL)
+      } else {
+        nameSel <- unlist(lapply(1:isolate(input$numPops), function(i) paste0("PopulationName", i)))
+        popSel <- unlist(lapply(1:isolate(input$numPops), function(i) paste0("Population", i)))
+        populations <- setNames(object = lapply(popSel, function(i) isolate(input[[i]])), 
+                                unlist(lapply(nameSel, function(i) isolate(input[[i]]))))
+        hybridsobj$setPopulations(populations)
+      }
     }
   })
   
-  output$SeqInfo <- renderText({
+  output$seqNum <- renderText({
+    updateSequence()
+    validate(need(hybridsobj$DNA$hasDNA(), "0"))
+    hybridsobj$DNA$numberOfSequences()
+  })
+  
+  output$bpLen <- renderText({
+    updateSequence()
+    validate(need(hybridsobj$DNA$hasDNA(), "0"))
+    hybridsobj$DNA$getFullLength()
+  })
+  
+  output$infLen <- renderText({
+    updateSequence()
+    validate(need(hybridsobj$DNA$hasDNA(), "0"))
+    hybridsobj$DNA$getInformativeLength()
+  })
+  
+  output$numPopulations <- renderText({
     updateSequence()
     updatePopulations()
-    validate(need(hybridsobj$DNA$hasDNA(), "Provide a FASTA format alignment to begin."))
-    hybridsobj$DNA$htmlSummary()
+    validate(need(hybridsobj$DNA$hasDNA(), "0"))
+    validate(need(hybridsobj$DNA$hasPopulations(), "0"))
+    hybridsobj$DNA$numberOfPopulations()
+  })
+  
+  output$seqNames <- renderText({
+    updateSequence()
+    validate(need(hybridsobj$DNA$hasDNA(), "Sequences have not been loaded."))
+    paste(hybridsobj$DNA$getSequenceNames(), collapse = ", ")
+  })
+  
+  output$popDetails <- renderUI({
+    updateSequence()
+    updatePopulations()
+    popNames <- hybridsobj$DNA$namesOfPopulations()
+    validate(need(hybridsobj$DNA$hasPopulations(), "No populations defined."))
+    lapply(1:hybridsobj$DNA$numberOfPopulations(), function(i){
+      fluidRow(box(title = popNames[i], solidHeader = TRUE, width = 12,
+                   paste0(hybridsobj$DNA$Populations[[i]], collapse = ", ")
+      ))
+    }) 
   })
   
   output$populationsGen <- renderUI({
     updateSequence()
+    validate(need(hybridsobj$DNA$hasDNA(), "Sequences have not been loaded."))
     validate(need(!is.na(input$numPops), "Enter a number of populations."))
     lapply(1:input$numPops, function(i) {
       fluidRow(
@@ -70,28 +116,23 @@ shinyServer(function(input, output, session){
       )
     })
   })
-                    
-                    
-  
-  
-  # ABBA-BABA section
   
   output$ABBAtree <- renderImage({
     width  <- session$clientData$output_ABBAtree_width
     height <- session$clientData$output_ABBAtree_height
     pixelratio <- session$clientData$pixelratio
     outfile <- tempfile(fileext='.png')
-    png(outfile, width=width*pixelratio, height=height*pixelratio,
-        res=72*pixelratio)
-    plot(read.tree(text="(((P1,P2),P3),P4);"))
-    nodelabels("A", c(1,4), adj = c(-2.5, 0.5), bg = "red", col="white")
-    nodelabels("B", c(2,3), adj = c(-2.5, 0.5), bg = "blue", col="white")
+    png(outfile, width = width * pixelratio, height = height * pixelratio,
+        res = 72 * pixelratio)
+    plot(ape:::read.tree(text="(((P1,P2),P3),P4);"))
+    ape:::nodelabels("A", c(1,4), adj = c(-2.5, 0.5), bg = "red", col="white")
+    ape:::nodelabels("B", c(2,3), adj = c(-2.5, 0.5), bg = "blue", col="white")
     dev.off()
     list(src = outfile,
          width = width,
          height = height,
          alt = "This is alternate text")}, deleteFile = TRUE)
-             
+  
   output$BABAtree <- renderImage({
     width  <- session$clientData$output_BABAtree_width
     height <- session$clientData$output_BABAtree_height
@@ -99,9 +140,9 @@ shinyServer(function(input, output, session){
     outfile <- tempfile(fileext='.png')
     png(outfile, width=width*pixelratio, height=height*pixelratio,
         res=72*pixelratio)
-    plot(read.tree(text="(((P1,P2),P3),P4);"))
-    nodelabels("A", c(2,4), adj = c(-2.5, 0.5), bg = "red", col="white")
-    nodelabels("B", c(1,3), adj = c(-2.5, 0.5), bg = "blue", col="white")
+    plot(ape:::read.tree(text="(((P1,P2),P3),P4);"))
+    ape:::nodelabels("A", c(2,4), adj = c(-2.5, 0.5), bg = "red", col="white")
+    ape:::nodelabels("B", c(1,3), adj = c(-2.5, 0.5), bg = "blue", col="white")
     dev.off()
     list(src = outfile,
          width = width,
@@ -146,29 +187,114 @@ shinyServer(function(input, output, session){
         c(P1 = isolate(input[[paste0("P1", i)]]), P2 = isolate(input[[paste0("P2", i)]]),
           P3 = isolate(input[[paste0("P3", i)]]), A = isolate(input[[paste0("A", i)]]))
       })
-      hybridsobj$prepareFourTaxonTests(combos)
+      combos <- combos[unlist(lapply(combos, function(x) length(unique(x)) == 4))]
+      if(length(combos) > 0)
+        hybridsobj$prepareFourTaxonTests(combos)
     }
   })
   
-  output$generatedCombos <- renderText({
+  output$generatedCombos <- renderUI({
     updateTaxaCombos()
-    paste(hybridsobj$FTTmodule$printAllNames(), collapse = "\n\n")
+    lapply(hybridsobj$FTTmodule$results, function(x){
+      box(title = NULL, width = 12,
+          paste0("P1: ", x$P1, ",\nP2: ", x$P2, ",\nP3: ", x$P3, ",\nA: ", x$A))
+    })
   })
   
+  output$combosToAnalyze <- renderUI({
+    updateTaxaCombos()
+    validate(need(hybridsobj$FTTmodule$hasTaxaCombos(), "Set taxa combinations to test."))
+    column(width = 12,
+           selectInput("fttToAnalyze", 
+                       tags$strong("Run / rerun four taxon test for combination:"),
+                       c("NOT.TESTED", "ALL", "TESTED", hybridsobj$FTTmodule$printAllNames()),
+                       selected = "ALL", multiple = TRUE),
+           numericInput("fttBlockSize", "Block Size:", NULL),
+           numericInput("fttNumberOfBlocks", "Number of Blocks:", NULL),
+           actionButton("runFTTs", "Run Tests")
+    )
+  })
   
+  doFTTests <- reactive({
+    input$runFTTs
+    if((length(hybridsobj$FTTmodule$results) != 0) && (input$runFTTs > 0)){
+      selections <- comboChoiceSorter(isolate(input$fttToAnalyze))
+      hybridsobj$runFourTaxonTests(selections = selections,
+                                   numberOfBlocks = isolate(input$fttNumberOfBlocks),
+                                   blockLength = isolate(input$fttBlockSize))
+    }  
+  })
   
-  # Gets HybRIDS to update the settings for generating triplets and update the triplets that are to be generated and analyzed.
+  output$combosToView <- renderUI({
+    updateTaxaCombos()
+    validate(need(hybridsobj$FTTmodule$hasTaxaCombos(), "Set taxa combinations to test."))
+    column(width = 12,
+           selectInput("fttView", 
+                       tags$strong("View four taxon test results for combination:"),
+                       c("NOT.TESTED", "ALL", "TESTED", "SIGNIFICANT", hybridsobj$FTTmodule$printAllNames()),
+                       selected = "ALL", multiple = TRUE)
+    )
+  })
+  
+  output$fttResults <- renderUI({
+    doFTTests()
+    selectedTests <- hybridsobj$FTTmodule$getFTTs(comboChoiceSorter(input$fttView))
+    lapply(selectedTests, function(x){
+      if(!x$noTestPerformed()){
+        testName <- paste0("P1: ", x$P1, ", P2: ", x$P2, ", P3: ", x$P3,
+                           ", P4: ", x$A)
+        tableName <- paste0("table_", x$P1, x$P2, x$P3, x$A)
+        table <- x$table[, c("BlockStart", "BlockEnd",
+                              "S", "numBinomialP",
+                              "ABBA", "BABA", "D", "Fd_1DD4_D0", "Fd_D2D4_D0",
+                              "blockFraction", "scaledPseudoD", "scaledPseudoFd_1DD4",
+                              "scaledPseudoFd_D2D4")]
+        colnames(table) <- c("BlockStart", "BlockEnd", "S", "BinomP", "ABBA", "BABA",
+                             "D", "Fd:P2,P3", "Fd:P1,P3", "BlockFraction", "PseudoD",
+                             "PseudoFd:P2,P3", "PeudoFd:P1,P3")
+        table[is.na(table)] <- 0
+        output[[tableName]] <- renderTable(table)
+        box(title = testName, width = 12, solidHeader = TRUE,
+            status = "primary", 
+            fluidRow(
+              box(title = "Global Stats", status = "primary", width = 12,
+                  fluidRow(
+                    valueBox(round(x$ABBA, 2), "ABBA", width = 3, color = "orange"),
+                    valueBox(round(x$BABA, 2), "BABA", width = 3, color = "yellow"),
+                    valueBox(round(x$X2_P, 10), "P-Value", width = 3, color = "green"),
+                    valueBox(round(x$Observed_D, 5), "D", width = 3, color = "blue"),
+                    valueBox(round(x$D_jEstimate, 5), "D (Jackknifed)", width = 3, color = "blue"),
+                    valueBox(round(x$Observed_Fd_1DD4, 5), "Fd(P2, P3)", width = 3, color = "navy"),
+                    valueBox(round(x$Fd_1DD4_jEstimate, 5), "Fd(P2, P3) (Jackknifed)", width = 3, color = "navy"),
+                    valueBox(round(x$Observed_Fd_D2D4, 5), "Fd(P1, P3)", width = 3, color = "navy"),
+                    valueBox(round(x$Fd_D2D4_jEstimate, 5), "Fd(P1, P3) (Jackknifed)", width = 3, color = "navy"),
+                    valueBox(round(x$D_jZ, 5), "Z score for D", width = 3, color = "purple"),
+                    valueBox(round(x$Fd_1DD4_jZ, 5), "Z score for Fd(P2, P3)", width = 3, color = "purple"),
+                    valueBox(round(x$Fd_D2D4_jZ, 5), "Z score for Fd(P1, P3)", width = 3, color = "purple")
+                  )
+              ),
+              box(title = "Jack-knifed segment stats", status = "warning", width = 12,
+                  tableOutput(tableName)
+              )
+            )
+        )
+      }
+    })
+  })
+  
   updateTripletGenSettings <- reactive({
     input$comboGen
     newoptions <- c()
-    if(isolate(input$betweengroups)){
+    if(isolate(input$fttOrPops) == "ftt"){
       newoptions <- c(newoptions, 1L)
+    } else {
+      newoptions <- c(newoptions, 2L)
     }
     if(isolate(input$distancebased)){
       if(isolate(input$distancemethod) == "yes"){
-        newoptions <- c(newoptions, 3L)
+        newoptions <- c(newoptions, 4L)
       } else {
-        newoptions <- c(newoptions, 2L)
+        newoptions <- c(newoptions, 3L)
       }
     }
     validate(
@@ -177,13 +303,10 @@ shinyServer(function(input, output, session){
     validate(
       need(hybridsobj$DNA$hasDNA(), "No sequence file is loaded into HybRIDS.")
     )
-    groups <- lapply(unlist(lapply(1:isolate(input$numGroups), function(i) paste0("group", i))), function(n) isolate(input[[n]]))
-    groups[sapply(groups, is.null)] <- NULL
     hybridsobj$setParameters("TripletGeneration",
                              Method = newoptions,
                              DistanceThreshold = isolate(input$mandistthreshold),
-                             PartitionStrictness = as.integer(isolate(input$partitionStrictness)),
-                             Groups = groups)
+                             PartitionStrictness = as.integer(isolate(input$partitionStrictness)))
   })
   
   output$NumCombos <- renderText({
@@ -194,30 +317,14 @@ shinyServer(function(input, output, session){
   output$GeneratedTriplets <- renderText({
     updateTripletGenSettings()
     hybridsobj$comparrisonSettings$htmlCombinations()
-    })
-  
-  output$tripletgen <- renderUI({
-    updateTripletGenSettings()
-    lapply(1:input$numGroups, function(i) {
-      selectInput(inputId=paste0("group", i), label=paste0("Sequence Group ", i),
-                  choices = hybridsobj$DNA$getSequenceNames(), multiple = TRUE)
-    })
   })
-  
-  # Server functions for the analyze triplets page.
   
   output$TripletToAnalyze <- renderUI({
     updateTripletGenSettings()
     selectInput("tripletToAnalyze", 
                 tags$strong("Run / rerun analysis for triplets:"),
-                c("ALL", hybridsobj$triplets$tripletCombinations()),
+                c("ALL", hybridsobj$comparrisonSettings$printAcceptedCombinations()),
                 selected = "ALL", multiple = TRUE)
-  })
-  
-  output$TripletSelector <- renderUI({
-    updateTripletGenSettings()
-    selectInput("tripletSelection", tags$strong("View triplet:"),
-                hybridsobj$triplets$tripletCombinations())
   })
   
   updatePlottingSettings <- reactive({
@@ -255,6 +362,7 @@ shinyServer(function(input, output, session){
                                BonfCorrection = isolate(input$bonf), DateAnyway = dateanyway,
                                MutationCorrection = isolate(input$correctionModel))
       selections <- strsplit(isolate(input$tripletToAnalyze), ", ")
+      hybridsobj$triplets$generateTriplets(hybridsobj$DNA, hybridsobj$comparrisonSettings, hybridsobj$filesDirectory)
       tripletsToDo <- hybridsobj$triplets$getTriplets(selections)
       numToDo <- length(tripletsToDo)
       prog <- Progress$new(session, min = 1, max = numToDo)
@@ -281,6 +389,12 @@ shinyServer(function(input, output, session){
     }
   })
   
+  output$TripletSelector <- renderUI({
+    analysis()
+    selectInput("tripletSelection", tags$strong("View triplet:"),
+                hybridsobj$triplets$tripletCombinations())
+  })
+  
   output$barsPlot <- renderPlot({
     analysis()
     updatePlottingSettings()
@@ -288,11 +402,11 @@ shinyServer(function(input, output, session){
                   "Triplets to choose from have not been generated yet."))
     selection <- unlist(strsplit(input$tripletSelection, ", "))
     validate(need(!hybridsobj$triplets$getTriplets(selection)[[1]]$noScanPerformed(),
-             "Sequence similarity scan has not been performed for this triplet yet."))
+                  "Sequence similarity scan has not been performed for this triplet yet."))
     barsPlot <- hybridsobj$plotTriplets(unlist(strsplit(input$tripletSelection, ", ")), What="Bars")[[1]]
     print(barsPlot)
   })
-
+  
   output$linesPlot <- renderPlot({
     analysis()
     updatePlottingSettings()
@@ -300,11 +414,11 @@ shinyServer(function(input, output, session){
                   "Triplets to choose from have not been generated yet."))
     selection <- unlist(strsplit(input$tripletSelection, ", "))
     validate(need(!hybridsobj$triplets$getTriplets(selection)[[1]]$noScanPerformed(),
-             "Sequence similarity scan has not been performed for this triplet yet."))
+                  "Sequence similarity scan has not been performed for this triplet yet."))
     linesPlot <- hybridsobj$plotTriplets(selection, What="Lines")[[1]]
     print(linesPlot)
   })
-
+  
   output$blocksTable <- renderDataTable({
     analysis()
     validate(need(is.character(input$tripletSelection),
@@ -312,17 +426,20 @@ shinyServer(function(input, output, session){
     validate(
       need(!hybridsobj$triplets$getTriplets(
         unlist(strsplit(input$tripletSelection, ", ")))[[1]]$blocksNotDated(),
-           "Recombinant regions have not been found or dated yet for the selected triplet."))
-    hybridsobj$tabulateDetectedBlocks(unlist(strsplit(input$tripletSelection, ", ")), Neat=TRUE)
+        "Recombinant regions have not been found or dated yet for the selected triplet."))
+    hybridsobj$tabulateDetectedBlocks(unlist(
+      strsplit(input$tripletSelection, ", ")), Neat=TRUE)[, c(-1, -3, -6, -7)]
   })
   
-  output$userBlocksTable <- renderDataTable({
-    updateSequence()
-    clearUserBlocks()
-    addUserBlocks()
-    dateUserBlocks()
-    hybridsobj$tabulateUserBlocks()
-  })
+  output$saveFTT <- downloadHandler(filename = 
+                                        function(){
+                                          paste0(strsplit(input$fastafile$name, ".fas")[1], "_FTT.csv")
+                                        },
+                                      content =
+                                        function(file){
+                                          write.csv(hybridsobj$tabulateFourTaxonTests(unlist(strsplit(input$combosToView, ", "))), file)
+                                        }
+  )
   
   output$saveTable <- downloadHandler(filename = 
                                         function(){
@@ -336,23 +453,23 @@ shinyServer(function(input, output, session){
   )
   
   output$saveBarPlots <- downloadHandler(filename =
-                                        function(){
-                                          paste0(strsplit(input$fastafile$name, ".fas")[1], "_Triplet_",
-                                                 paste(unlist(strsplit(input$tripletSelection, ", ")), collapse = ":"), "_Bars.png")
-                                        },
-                                        content = 
-                                          function(file){
-                                            selection <- unlist(strsplit(isolate(input$tripletSelection), ", "))
-                                            whichToPlot <- isolate(input$whichPlotToSave)
-                                            if(whichToPlot == "Both"){
-                                              whichToPlot <- c("Bars", "Lines")
-                                            }
-                                            Plot <- hybridsobj$plotTriplets(selection, What = whichToPlot)[[1]]
-                                            ggsave("plot.png", plot = Plot, width = isolate(input$widthSave), height = isolate(input$heightSave),
-                                                   dpi = isolate(input$resSave), units = "in")
-                                            file.copy("plot.png", file, overwrite=TRUE)
-                                          })
-    
+                                           function(){
+                                             paste0(strsplit(input$fastafile$name, ".fas")[1], "_Triplet_",
+                                                    paste(unlist(strsplit(input$tripletSelection, ", ")), collapse = ":"), "_Bars.png")
+                                           },
+                                         content = 
+                                           function(file){
+                                             selection <- unlist(strsplit(isolate(input$tripletSelection), ", "))
+                                             whichToPlot <- isolate(input$whichPlotToSave)
+                                             if(whichToPlot == "Both"){
+                                               whichToPlot <- c("Bars", "Lines")
+                                             }
+                                             Plot <- hybridsobj$plotTriplets(selection, What = whichToPlot)[[1]]
+                                             ggsave("plot.png", plot = Plot, width = isolate(input$widthSave), height = isolate(input$heightSave),
+                                                    dpi = isolate(input$resSave), units = "in")
+                                             file.copy("plot.png", file, overwrite=TRUE)
+                                           })
+  
   output$userBlocksSeqSelect <- renderUI({
     updateSequence()
     selectInput("seqChoice", "Select two sequences",
@@ -376,16 +493,18 @@ shinyServer(function(input, output, session){
   
   dateUserBlocks <- reactive({
     input$dateUBButton
-    dateanyway <- !isolate(input$eliminateinsignificant2)
     hybridsobj$setParameters("BlockDating", MutationRate = isolate(input$mu2), PValue = isolate(input$alpha2),
-                             BonfCorrection = isolate(input$bonf2), DateAnyway = dateanyway,
+                             BonfCorrection = isolate(input$bonf2), DateAnyway = !isolate(input$eliminateinsignificant2),
                              MutationCorrection = isolate(input$correctionModel2))
     hybridsobj$dateUserBlocks()
   })
   
-  output$activeTab <- reactive({
-    return(input$tab)
+  output$userBlocksTable <- renderDataTable({
+    updateSequence()
+    clearUserBlocks()
+    addUserBlocks()
+    dateUserBlocks()
+    hybridsobj$tabulateUserBlocks()
   })
-  outputOptions(output, 'activeTab', suspendWhenHidden=FALSE)
   
-})
+}
