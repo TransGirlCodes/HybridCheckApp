@@ -1,6 +1,7 @@
-
 library(shinydashboard)
 library(HybRIDS)
+
+options(shiny.maxRequestSize=10000*1024^2)
 
 comboChoiceSorter <- function(inputs){
   return(lapply(inputs, function(x){
