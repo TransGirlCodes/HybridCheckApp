@@ -1,5 +1,5 @@
 library(shinydashboard)
-library(HybRIDS)
+library(HybridCheck)
 
 options(shiny.maxRequestSize=10000*1024^2)
 
@@ -19,82 +19,82 @@ comboChoiceSorter <- function(inputs){
 
 function(input, output, session){
   
-  hybridsobj <- HybRIDS$new()
+  HCobj <- HC$new()
   
   updateSequence <- reactive({
     if(!is.null(input$fastafile$datapath) && (grepl(".fas", input$fastafile$name) || grepl(".fasta", input$fastafile$name)))
-      hybridsobj$inputDNA(input$fastafile$datapath)
+      HCobj$inputDNA(input$fastafile$datapath)
   })
   
   updatePopulations <- reactive({
     input$setPops
-    if(hybridsobj$DNA$hasDNA()){
+    if(HCobj$DNA$hasDNA()){
       if(!isolate(input$oneSeqOnePop)){
-        hybridsobj$setPopulations(NULL)
+        HCobj$setPopulations(NULL)
       } else {
         nameSel <- unlist(lapply(1:isolate(input$numPops), function(i) paste0("PopulationName", i)))
         popSel <- unlist(lapply(1:isolate(input$numPops), function(i) paste0("Population", i)))
         populations <- setNames(object = lapply(popSel, function(i) isolate(input[[i]])), 
                                 unlist(lapply(nameSel, function(i) isolate(input[[i]]))))
-        hybridsobj$setPopulations(populations)
+        HCobj$setPopulations(populations)
       }
     }
   })
   
   output$seqNum <- renderText({
     updateSequence()
-    validate(need(hybridsobj$DNA$hasDNA(), "0"))
-    hybridsobj$DNA$numberOfSequences()
+    validate(need(HCobj$DNA$hasDNA(), "0"))
+    HCobj$DNA$numberOfSequences()
   })
   
   output$bpLen <- renderText({
     updateSequence()
-    validate(need(hybridsobj$DNA$hasDNA(), "0"))
-    hybridsobj$DNA$getFullLength()
+    validate(need(HCobj$DNA$hasDNA(), "0"))
+    HCobj$DNA$getFullLength()
   })
   
   output$infLen <- renderText({
     updateSequence()
-    validate(need(hybridsobj$DNA$hasDNA(), "0"))
-    hybridsobj$DNA$getInformativeLength()
+    validate(need(HCobj$DNA$hasDNA(), "0"))
+    HCobj$DNA$getInformativeLength()
   })
   
   output$numPopulations <- renderText({
     updateSequence()
     updatePopulations()
-    validate(need(hybridsobj$DNA$hasDNA(), "0"))
-    validate(need(hybridsobj$DNA$hasPopulations(), "0"))
-    hybridsobj$DNA$numberOfPopulations()
+    validate(need(HCobj$DNA$hasDNA(), "0"))
+    validate(need(HCobj$DNA$hasPopulations(), "0"))
+    HCobj$DNA$numberOfPopulations()
   })
   
   output$seqNames <- renderText({
     updateSequence()
-    validate(need(hybridsobj$DNA$hasDNA(), "Sequences have not been loaded."))
-    paste(hybridsobj$DNA$getSequenceNames(), collapse = ", ")
+    validate(need(HCobj$DNA$hasDNA(), "Sequences have not been loaded."))
+    paste(HCobj$DNA$getSequenceNames(), collapse = ", ")
   })
   
   output$popDetails <- renderUI({
     updateSequence()
     updatePopulations()
-    popNames <- hybridsobj$DNA$namesOfPopulations()
-    validate(need(hybridsobj$DNA$hasPopulations(), "No populations defined."))
-    lapply(1:hybridsobj$DNA$numberOfPopulations(), function(i){
+    popNames <- HCobj$DNA$namesOfPopulations()
+    validate(need(HCobj$DNA$hasPopulations(), "No populations defined."))
+    lapply(1:HCobj$DNA$numberOfPopulations(), function(i){
       fluidRow(box(title = popNames[i], solidHeader = TRUE, width = 12,
-                   paste0(hybridsobj$DNA$Populations[[i]], collapse = ", ")
+                   paste0(HCobj$DNA$Populations[[i]], collapse = ", ")
       ))
     }) 
   })
   
   output$populationsGen <- renderUI({
     updateSequence()
-    validate(need(hybridsobj$DNA$hasDNA(), "Sequences have not been loaded."))
+    validate(need(HCobj$DNA$hasDNA(), "Sequences have not been loaded."))
     validate(need(!is.na(input$numPops), "Enter a number of populations."))
     lapply(1:input$numPops, function(i) {
       fluidRow(
         column(6, textInput(inputId=paste0("PopulationName", i), label=paste0("Population Name"))),
         column(6,
                selectInput(inputId=paste0("Population", i), label=paste0("Sequences"),
-                           choices = hybridsobj$DNA$getSequenceNames(), multiple = TRUE) 
+                           choices = HCobj$DNA$getSequenceNames(), multiple = TRUE) 
         )
       )
     })
@@ -136,27 +136,27 @@ function(input, output, session){
     updateSequence()
     updatePopulations()
     validate(need(!is.na(input$fttNumCombos), "Enter a number of taxa combos to analyse."))
-    validate(need(length(hybridsobj$DNA$Populations) >= 4, "You need 4 or more populations defined."))
+    validate(need(length(HCobj$DNA$Populations) >= 4, "You need 4 or more populations defined."))
     fluidRow(
       column(3,
              lapply(1:input$fttNumCombos, function(i) {
                selectInput(inputId=paste0("P1", i), label = "P1",
-                           choices = hybridsobj$DNA$namesOfPopulations())
+                           choices = HCobj$DNA$namesOfPopulations())
              })),
       column(3,
              lapply(1:input$fttNumCombos, function(i) {
                selectInput(inputId=paste0("P2", i), label = "P2",
-                           choices = hybridsobj$DNA$namesOfPopulations())
+                           choices = HCobj$DNA$namesOfPopulations())
              })),
       column(3,
              lapply(1:input$fttNumCombos, function(i) {
                selectInput(inputId=paste0("P3", i), label = "P3",
-                           choices = hybridsobj$DNA$namesOfPopulations())
+                           choices = HCobj$DNA$namesOfPopulations())
              })),
       column(3,
              lapply(1:input$fttNumCombos, function(i) {
                selectInput(inputId=paste0("A", i), label = "P4",
-                           choices = hybridsobj$DNA$namesOfPopulations())
+                           choices = HCobj$DNA$namesOfPopulations())
              }))
     )
   })
@@ -164,7 +164,7 @@ function(input, output, session){
   updateTaxaCombos <- reactive({
     input$setCombinations
     if(isolate(input$fttAutoSets)){
-      hybridsobj$prepareFourTaxonTests()
+      HCobj$prepareFourTaxonTests()
     } else {
       combos <- lapply(1:isolate(input$fttNumCombos), function(i){
         c(P1 = isolate(input[[paste0("P1", i)]]), P2 = isolate(input[[paste0("P2", i)]]),
@@ -172,13 +172,13 @@ function(input, output, session){
       })
       combos <- combos[unlist(lapply(combos, function(x) length(unique(x)) == 4))]
       if(length(combos) > 0)
-        hybridsobj$prepareFourTaxonTests(combos)
+        HCobj$prepareFourTaxonTests(combos)
     }
   })
   
   output$generatedCombos <- renderUI({
     updateTaxaCombos()
-    lapply(hybridsobj$FTTmodule$results, function(x){
+    lapply(HCobj$FTTmodule$results, function(x){
       box(title = NULL, width = 12,
           paste0("P1: ", x$P1, ",\nP2: ", x$P2, ",\nP3: ", x$P3, ",\nA: ", x$A))
     })
@@ -186,11 +186,11 @@ function(input, output, session){
   
   output$combosToAnalyze <- renderUI({
     updateTaxaCombos()
-    validate(need(hybridsobj$FTTmodule$hasTaxaCombos(), "Set taxa combinations to test."))
+    validate(need(HCobj$FTTmodule$hasTaxaCombos(), "Set taxa combinations to test."))
     column(width = 12,
            selectInput("fttToAnalyze", 
                        tags$strong("Run / rerun four taxon test for combination:"),
-                       c("NOT.TESTED", "ALL", "TESTED", hybridsobj$FTTmodule$printAllNames()),
+                       c("NOT.TESTED", "ALL", "TESTED", HCobj$FTTmodule$printAllNames()),
                        selected = "ALL", multiple = TRUE),
            numericInput("fttBlockSize", "Block Size:", NULL),
            numericInput("fttNumberOfBlocks", "Number of Blocks:", NULL),
@@ -200,9 +200,9 @@ function(input, output, session){
   
   doFTTests <- reactive({
     input$runFTTs
-    if((length(hybridsobj$FTTmodule$results) != 0) && (input$runFTTs > 0)){
+    if((length(HCobj$FTTmodule$results) != 0) && (input$runFTTs > 0)){
       selections <- comboChoiceSorter(isolate(input$fttToAnalyze))
-      hybridsobj$runFourTaxonTests(selections = selections,
+      HCobj$runFourTaxonTests(selections = selections,
                                    numberOfBlocks = isolate(input$fttNumberOfBlocks),
                                    blockLength = isolate(input$fttBlockSize))
     }  
@@ -210,18 +210,18 @@ function(input, output, session){
   
   output$combosToView <- renderUI({
     updateTaxaCombos()
-    validate(need(hybridsobj$FTTmodule$hasTaxaCombos(), "Set taxa combinations to test."))
+    validate(need(HCobj$FTTmodule$hasTaxaCombos(), "Set taxa combinations to test."))
     column(width = 12,
            selectInput("fttView", 
                        tags$strong("View four taxon test results for combination:"),
-                       c("NOT.TESTED", "ALL", "TESTED", "SIGNIFICANT", hybridsobj$FTTmodule$printAllNames()),
+                       c("NOT.TESTED", "ALL", "TESTED", "SIGNIFICANT", HCobj$FTTmodule$printAllNames()),
                        selected = "ALL", multiple = TRUE)
     )
   })
   
   output$fttResults <- renderUI({
     doFTTests()
-    selectedTests <- hybridsobj$FTTmodule$getFTTs(comboChoiceSorter(input$fttView))
+    selectedTests <- HCobj$FTTmodule$getFTTs(comboChoiceSorter(input$fttView))
     lapply(selectedTests, function(x){
       if(!x$noTestPerformed()){
         testName <- paste0("P1: ", x$P1, ", P2: ", x$P2, ", P3: ", x$P3,
@@ -284,9 +284,9 @@ function(input, output, session){
       need(!is.null(newoptions), "Select either to generate triplet combinations based on group specification or based on distance, or both.")
     )
     validate(
-      need(hybridsobj$DNA$hasDNA(), "No sequence file is loaded into HybRIDS.")
+      need(HCobj$DNA$hasDNA(), "No sequence file is loaded into HC.")
     )
-    hybridsobj$setParameters("TripletGeneration",
+    HCobj$setParameters("TripletGeneration",
                              Method = newoptions,
                              DistanceThreshold = isolate(input$mandistthreshold),
                              PartitionStrictness = as.integer(isolate(input$partitionStrictness)))
@@ -294,24 +294,24 @@ function(input, output, session){
   
   output$NumCombos <- renderText({
     updateTripletGenSettings()
-    length(hybridsobj$comparrisonSettings$AcceptedCombinations)
+    length(HCobj$comparrisonSettings$AcceptedCombinations)
   })
   
   output$GeneratedTriplets <- renderText({
     updateTripletGenSettings()
-    hybridsobj$comparrisonSettings$htmlCombinations()
+    HCobj$comparrisonSettings$htmlCombinations()
   })
   
   output$TripletToAnalyze <- renderUI({
     updateTripletGenSettings()
     selectInput("tripletToAnalyze", 
                 tags$strong("Run / rerun analysis for triplets:"),
-                c("ALL", hybridsobj$comparrisonSettings$printAcceptedCombinations()),
+                c("ALL", HCobj$comparrisonSettings$printAcceptedCombinations()),
                 selected = "ALL", multiple = TRUE)
   })
   
   updatePlottingSettings <- reactive({
-    hybridsobj$setParameters("Plotting", PlotTitle = input$plotTitle,
+    HCobj$setParameters("Plotting", PlotTitle = input$plotTitle,
                              TitleSize = input$plotTitleSize,
                              TitleFace = input$plotTitleFace,
                              TitleColour = input$plotTitleColour,
@@ -334,38 +334,38 @@ function(input, output, session){
   
   analysis <- reactive({
     input$analysisGO
-    if(hybridsobj$DNA$hasDNA() && (input$analysisGO != 0)){
-      hybridsobj$setParameters("SSAnalysis", WindowSize = as.integer(isolate(input$windowSize)),
+    if(HCobj$DNA$hasDNA() && (input$analysisGO != 0)){
+      HCobj$setParameters("SSAnalysis", WindowSize = as.integer(isolate(input$windowSize)),
                                StepSize = as.integer(isolate(input$stepSize)))
-      hybridsobj$setParameters("BlockDetection", ManualThresholds = isolate(input$manBlockDetectDist),
+      HCobj$setParameters("BlockDetection", ManualThresholds = isolate(input$manBlockDetectDist),
                                AutoThresholds = (isolate(input$detectionMethod) == "no"),
                                ManualFallback = isolate(input$fallbackManual))
       dateanyway <- !isolate(input$eliminateinsignificant)
-      hybridsobj$setParameters("BlockDating", MutationRate = isolate(input$mu), PValue = isolate(input$alpha),
+      HCobj$setParameters("BlockDating", MutationRate = isolate(input$mu), PValue = isolate(input$alpha),
                                BonfCorrection = isolate(input$bonf), DateAnyway = dateanyway,
                                MutationCorrection = isolate(input$correctionModel))
       selections <- strsplit(isolate(input$tripletToAnalyze), ", ")
-      hybridsobj$triplets$generateTriplets(hybridsobj$DNA, hybridsobj$comparrisonSettings, hybridsobj$filesDirectory)
-      tripletsToDo <- hybridsobj$triplets$getTriplets(selections)
+      HCobj$triplets$generateTriplets(HCobj$DNA, HCobj$comparrisonSettings, HCobj$filesDirectory)
+      tripletsToDo <- HCobj$triplets$getTriplets(selections)
       numToDo <- length(tripletsToDo)
       prog <- Progress$new(session, min = 1, max = numToDo)
       prog$set(value = 0, message = "Scanning SS in triplets...")
       for(i in 1:numToDo){
-        HybRIDS:::scan.similarity(hybridsobj$DNA, tripletsToDo[[i]], hybridsobj$ssAnalysisSettings)
+        HC:::scan.similarity(HCobj$DNA, tripletsToDo[[i]], HCobj$ssAnalysisSettings)
         prog$set(value = i)
       }
       prog$close()
       prog <- Progress$new(session, min = 1, max = numToDo)
       prog$set(value = 0, message = "Finding blocks in triplets...")
       for(i in 1:numToDo){
-        tripletsToDo[[i]]$putativeBlockFind(hybridsobj$blockDetectionSettings)
+        tripletsToDo[[i]]$putativeBlockFind(HCobj$blockDetectionSettings)
         prog$set(value = i)
       }
       prog$close()
       prog <- Progress$new(session, min = 1, max = numToDo)
       prog$set(value = 0, message = "Dating blocks...")
       for(i in 1:numToDo){
-        tripletsToDo[[i]]$blockDate(hybridsobj$DNA, hybridsobj$blockDatingSettings)
+        tripletsToDo[[i]]$blockDate(HCobj$DNA, HCobj$blockDatingSettings)
         prog$set(value = i)
       }
       prog$close() 
@@ -375,7 +375,7 @@ function(input, output, session){
   output$TripletSelector <- renderUI({
     analysis()
     selectInput("tripletSelection", tags$strong("View triplet:"),
-                hybridsobj$triplets$tripletCombinations())
+                HCobj$triplets$tripletCombinations())
   })
   
   output$barsPlot <- renderPlot({
@@ -384,9 +384,9 @@ function(input, output, session){
     validate(need(is.character(input$tripletSelection), 
                   "Triplets to choose from have not been generated yet."))
     selection <- unlist(strsplit(input$tripletSelection, ", "))
-    validate(need(!hybridsobj$triplets$getTriplets(selection)[[1]]$noScanPerformed(),
+    validate(need(!HCobj$triplets$getTriplets(selection)[[1]]$noScanPerformed(),
                   "Sequence similarity scan has not been performed for this triplet yet."))
-    barsPlot <- hybridsobj$plotTriplets(unlist(strsplit(input$tripletSelection, ", ")), What="Bars")[[1]]
+    barsPlot <- HCobj$plotTriplets(unlist(strsplit(input$tripletSelection, ", ")), What="Bars")[[1]]
     print(barsPlot)
   })
   
@@ -396,9 +396,9 @@ function(input, output, session){
     validate(need(is.character(input$tripletSelection), 
                   "Triplets to choose from have not been generated yet."))
     selection <- unlist(strsplit(input$tripletSelection, ", "))
-    validate(need(!hybridsobj$triplets$getTriplets(selection)[[1]]$noScanPerformed(),
+    validate(need(!HCobj$triplets$getTriplets(selection)[[1]]$noScanPerformed(),
                   "Sequence similarity scan has not been performed for this triplet yet."))
-    linesPlot <- hybridsobj$plotTriplets(selection, What="Lines")[[1]]
+    linesPlot <- HCobj$plotTriplets(selection, What="Lines")[[1]]
     print(linesPlot)
   })
   
@@ -407,10 +407,10 @@ function(input, output, session){
     validate(need(is.character(input$tripletSelection),
                   "Triplets to choose from have not been generated yet."))
     validate(
-      need(!hybridsobj$triplets$getTriplets(
+      need(!HCobj$triplets$getTriplets(
         unlist(strsplit(input$tripletSelection, ", ")))[[1]]$blocksNotDated(),
         "Recombinant regions have not been found or dated yet for the selected triplet."))
-    hybridsobj$tabulateDetectedBlocks(unlist(
+    HCobj$tabulateDetectedBlocks(unlist(
       strsplit(input$tripletSelection, ", ")), Neat=TRUE)[, c(-1, -3, -6, -7)]
   })
   
@@ -420,7 +420,7 @@ function(input, output, session){
                                         },
                                       content =
                                         function(file){
-                                          write.csv(hybridsobj$tabulateFourTaxonTests(unlist(strsplit(input$combosToView, ", "))), file)
+                                          write.csv(HCobj$tabulateFourTaxonTests(unlist(strsplit(input$combosToView, ", "))), file)
                                         }
   )
   
@@ -431,7 +431,7 @@ function(input, output, session){
                                         },
                                       content =
                                         function(file){
-                                          write.csv(hybridsobj$tabulateDetectedBlocks(unlist(strsplit(input$tripletSelection, ", ")), Neat=TRUE), file)
+                                          write.csv(HCobj$tabulateDetectedBlocks(unlist(strsplit(input$tripletSelection, ", ")), Neat=TRUE), file)
                                         }
   )
   
@@ -447,7 +447,7 @@ function(input, output, session){
                                              if(whichToPlot == "Both"){
                                                whichToPlot <- c("Bars", "Lines")
                                              }
-                                             Plot <- hybridsobj$plotTriplets(selection, What = whichToPlot)[[1]]
+                                             Plot <- HCobj$plotTriplets(selection, What = whichToPlot)[[1]]
                                              ggsave("plot.png", plot = Plot, width = isolate(input$widthSave), height = isolate(input$heightSave),
                                                     dpi = isolate(input$resSave), units = "in")
                                              file.copy("plot.png", file, overwrite=TRUE)
@@ -456,30 +456,30 @@ function(input, output, session){
   output$userBlocksSeqSelect <- renderUI({
     updateSequence()
     selectInput("seqChoice", "Select two sequences",
-                hybridsobj$DNA$getSequenceNames(), multiple = TRUE)
+                HCobj$DNA$getSequenceNames(), multiple = TRUE)
   })
   
   addUserBlocks <- reactive({
     input$addUBButton
     validate(need(isolate(input$startPosition) < isolate(input$endPosition), "Start position must be less than the end position."))
     if(length(isolate(input$seqChoice)) == 2){
-      hybridsobj$addUserBlock(isolate(input$seqChoice), isolate(input$startPosition), isolate(input$endPosition))
+      HCobj$addUserBlock(isolate(input$seqChoice), isolate(input$startPosition), isolate(input$endPosition))
     }
   })
   
   clearUserBlocks <- reactive({
     input$clearUBButton
     if(length(isolate(input$seqChoice)) == 2){
-      hybridsobj$clearUserBlocks(isolate(input$seqChoice))
+      HCobj$clearUserBlocks(isolate(input$seqChoice))
     }
   })
   
   dateUserBlocks <- reactive({
     input$dateUBButton
-    hybridsobj$setParameters("BlockDating", MutationRate = isolate(input$mu2), PValue = isolate(input$alpha2),
+    HCobj$setParameters("BlockDating", MutationRate = isolate(input$mu2), PValue = isolate(input$alpha2),
                              BonfCorrection = isolate(input$bonf2), DateAnyway = !isolate(input$eliminateinsignificant2),
                              MutationCorrection = isolate(input$correctionModel2))
-    hybridsobj$dateUserBlocks()
+    HCobj$dateUserBlocks()
   })
   
   output$userBlocksTable <- renderDataTable({
@@ -487,7 +487,7 @@ function(input, output, session){
     clearUserBlocks()
     addUserBlocks()
     dateUserBlocks()
-    hybridsobj$tabulateUserBlocks()
+    HCobj$tabulateUserBlocks()
   })
   
 }

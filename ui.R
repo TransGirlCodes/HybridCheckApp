@@ -1,6 +1,6 @@
 library(shinydashboard)
 
-header <- dashboardHeader(title = "HybRIDS")
+header <- dashboardHeader(title = "HybridCheck")
 
 sidebar <- dashboardSidebar(
   sidebarMenu(
