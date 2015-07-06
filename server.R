@@ -351,7 +351,7 @@ function(input, output, session){
       prog <- Progress$new(session, min = 1, max = numToDo)
       prog$set(value = 0, message = "Scanning SS in triplets...")
       for(i in 1:numToDo){
-        HC:::scan.similarity(HCobj$DNA, tripletsToDo[[i]], HCobj$ssAnalysisSettings)
+        HybridCheck:::scan.similarity(HCobj$DNA, tripletsToDo[[i]], HCobj$ssAnalysisSettings)
         prog$set(value = i)
       }
       prog$close()
