@@ -247,9 +247,6 @@ body <- dashboardBody(
                     plotOutput("linesPlot")
                 )),
                 dataTableOutput("blocksTable")
-                
-                  
-                
             )
             
     ),

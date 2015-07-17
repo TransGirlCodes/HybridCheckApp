@@ -1,7 +1,7 @@
 library(shinydashboard)
 library(HybridCheck)
 
-options(shiny.maxRequestSize=10000*1024^2)
+options(shiny.maxRequestSize = 10000 * 1024 ^ 2)
 
 comboChoiceSorter <- function(inputs){
   return(lapply(inputs, function(x){
@@ -387,6 +387,7 @@ function(input, output, session){
     validate(need(!HCobj$triplets$getTriplets(selection)[[1]]$noScanPerformed(),
                   "Sequence similarity scan has not been performed for this triplet yet."))
     barsPlot <- HCobj$plotTriplets(unlist(strsplit(input$tripletSelection, ", ")), What="Bars")[[1]]
+    message("Barsplot of class: ", paste0(class(barsPlot), collapse = ", "))
     print(barsPlot)
   })
   
@@ -399,6 +400,7 @@ function(input, output, session){
     validate(need(!HCobj$triplets$getTriplets(selection)[[1]]$noScanPerformed(),
                   "Sequence similarity scan has not been performed for this triplet yet."))
     linesPlot <- HCobj$plotTriplets(selection, What="Lines")[[1]]
+    message("Linesplot of class: ", paste0(class(linesPlot), collapse = ", "))
     print(linesPlot)
   })
   
@@ -448,9 +450,16 @@ function(input, output, session){
                                                whichToPlot <- c("Bars", "Lines")
                                              }
                                              Plot <- HCobj$plotTriplets(selection, What = whichToPlot)[[1]]
-                                             ggsave("plot.png", plot = Plot, width = isolate(input$widthSave), height = isolate(input$heightSave),
-                                                    dpi = isolate(input$resSave), units = "in")
-                                             file.copy("plot.png", file, overwrite=TRUE)
+                                             #ggsave("plot.png", plot = Plot, width = isolate(input$widthSave), height = isolate(input$heightSave),
+                                              #      dpi = isolate(input$resSave), units = "in")
+                                             #file.copy("plot.png", file, overwrite=TRUE)
+                                             png(filename = file, 
+                                                 width = isolate(input$widthSave),
+                                                 height = isolate(input$heightSave), 
+                                                 units = "in",
+                                                 res = isolate(input$resSave))
+                                             print(Plot)
+                                             dev.off()
                                            })
   
   output$userBlocksSeqSelect <- renderUI({
